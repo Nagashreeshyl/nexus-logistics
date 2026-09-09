@@ -25,10 +25,10 @@ export function App() {
             <Route path="presentation" element={<PresentationPage />} />
           </Route>
 
-          {/* Full-page V1 Lab — outside shell so chrome matches main */}
-          <Route path="/optimizer" element={<OptimizerLabPage />} />
+          {/* Multi-page V1 Lab — nested routes under OptimizerLabPage */}
+          <Route path="/optimizer/*" element={<OptimizerLabPage />} />
           <Route path="/lab" element={<Navigate to="/optimizer" replace />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/lab/*" element={<Navigate to="/optimizer" replace />} />          <Route path="/login" element={<LoginPage />} />
 
           <Route element={<RequireAuth />}>
             <Route path="/unauthorized" element={<UnauthorizedPage />} />

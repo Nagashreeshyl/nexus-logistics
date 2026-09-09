@@ -1,42 +1,48 @@
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 import { writeLabSession } from "../lib/labSession";
-import { Console } from "./Console";
+import { LabProvider } from "./lab/LabSessionContext";
+import { LabShell } from "./lab/LabShell";
+import { LabOverviewPage } from "./lab/LabOverviewPage";
+import { LabScenarioPage } from "./lab/LabScenarioPage";
+import { LabPlanPage } from "./lab/LabPlanPage";
+import { LabRiskPage } from "./lab/LabRiskPage";
+import { LabExceptionsPage } from "./lab/LabExceptionsPage";
+import { LabEvidencePage } from "./lab/LabEvidencePage";
+import { LabExportsPage } from "./lab/LabExportsPage";
+import { LabAnalyticsPage } from "./lab/LabAnalyticsPage";
 
 /**
- * Optimizer Lab — preserves presentation return-slide deep links.
+ * Multi-page Optimizer Lab — shared LabProvider state across routes.
  */
 export function OptimizerLabPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const returnTo = params.get("returnTo") || "/presentation?slide=7";
+  const returnTo = params.get("returnTo") || "/";
   const fromSlide = Number(params.get("fromSlide") || "") || undefined;
 
   useEffect(() => {
     writeLabSession({
       returnTo,
-      slide: fromSlide && fromSlide >= 1 && fromSlide <= 9 ? fromSlide : undefined,
+      slide: fromSlide && fromSlide >= 1 && fromSlide <= 6 ? fromSlide : undefined,
     });
   }, [returnTo, fromSlide]);
 
   return (
-    <div className="min-h-dvh bg-paper text-ink">
-      <div className="flex items-center justify-between gap-3 border-b border-hairline bg-snow px-4 py-2.5 sm:px-6">
-        <button
-          type="button"
-          onClick={() => navigate(returnTo)}
-          className="font-sans text-[13px] font-semibold text-mute hover:text-ink"
-        >
-          ← Back to Presentation
-        </button>
-        <div className="flex items-center gap-3">
-          <Link to="/presentation" className="font-sans text-[13px] font-semibold text-mute hover:text-ink">
-            Presentation
-          </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-mute">Optimizer Lab</span>
-        </div>
-      </div>
-      <Console onBack={() => navigate(returnTo)} />
-    </div>
+    <LabProvider onBack={() => navigate(returnTo)}>
+      <Routes>
+        <Route element={<LabShell />}>
+          <Route index element={<LabOverviewPage />} />
+          <Route path="scenario" element={<LabScenarioPage />} />
+          <Route path="plan" element={<LabPlanPage />} />
+          <Route path="risk" element={<LabRiskPage />} />
+          <Route path="exceptions" element={<LabExceptionsPage />} />
+          <Route path="analytics" element={<LabAnalyticsPage />} />
+          <Route path="evidence" element={<LabEvidencePage />} />
+          <Route path="exports" element={<LabExportsPage />} />
+          <Route path="*" element={<Navigate to="/optimizer" replace />} />
+        </Route>
+      </Routes>
+    </LabProvider>
   );
 }

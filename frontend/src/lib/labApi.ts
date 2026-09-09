@@ -39,11 +39,13 @@ export interface LabScenarioPayload {
   depot_address: string;
   orders: LabOrder[];
   vehicles: LabVehicle[];
+  archetype?: string;
   summary: {
     orders: number;
     vehicles: number;
     critical: number;
     total_demand: number;
+    archetype?: string;
   };
 }
 
@@ -97,8 +99,17 @@ async function labFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function loadSyntheticScenario(): Promise<LabScenarioPayload> {
-  return labFetch<LabScenarioPayload>("/api/lab/synthetic", { method: "POST" });
+export type LabArchetype = "balanced" | "surge" | "tight_windows" | "fleet_shortage";
+
+export function loadSyntheticScenario(opts?: {
+  archetype?: LabArchetype;
+  seed?: number;
+}): Promise<LabScenarioPayload> {
+  const q = new URLSearchParams();
+  if (opts?.archetype) q.set("archetype", opts.archetype);
+  if (opts?.seed != null) q.set("seed", String(opts.seed));
+  const qs = q.toString();
+  return labFetch<LabScenarioPayload>(`/api/lab/synthetic${qs ? `?${qs}` : ""}`, { method: "POST" });
 }
 
 export function runLabOptimize(payload: {

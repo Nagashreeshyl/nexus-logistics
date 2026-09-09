@@ -1,0 +1,46 @@
+@page {
+  size: A4;
+  margin: 18mm 16mm 18mm 16mm;
+}
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.45;
+  color: #0a0a0a;
+}
+h1 {
+  font-size: 18pt;
+  border-bottom: 2px solid #f47c59;
+  padding-bottom: 4px;
+  margin-top: 1.4em;
+  page-break-after: avoid;
+}
+h2 {
+  font-size: 13.5pt;
+  color: #c45c26;
+  margin-top: 1.2em;
+  page-break-after: avoid;
+}
+h3 { font-size: 11.5pt; margin-top: 1em; }
+blockquote {
+  margin: 0.6em 0;
+  padding: 0.55em 0.85em;
+  border-left: 3px solid #f47c59;
+  background: #fff5f2;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+  margin: 0.8em 0;
+}
+th, td {
+  border: 1px solid #d6d4ce;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+th { background: #f7f6f2; text-align: left; }
+code { font-size: 0.92em; }
+hr { border: none; border-top: 1px solid #d6d4ce; margin: 1.2em 0; }
+ul, ol { margin: 0.4em 0 0.6em 1.2em; }
+strong { font-weight: 650; }

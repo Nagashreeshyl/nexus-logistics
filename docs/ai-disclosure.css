@@ -1,0 +1,49 @@
+@page {
+  size: A4;
+  margin: 20mm 18mm;
+}
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11.5pt;
+  line-height: 1.45;
+  color: #0a0a0a;
+}
+h1 {
+  font-size: 20pt;
+  margin-bottom: 0.4em;
+  border-bottom: 3px solid #f47c59;
+  padding-bottom: 6px;
+}
+h2 {
+  font-size: 13pt;
+  margin-top: 1.4em;
+  color: #c45c26;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0 1.2em;
+  font-size: 10.5pt;
+}
+th, td {
+  border: 1px solid #d6d4ce;
+  padding: 10px 12px;
+  vertical-align: top;
+  text-align: left;
+}
+th {
+  background: #f7f6f2;
+  width: 32%;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 9.5pt;
+  letter-spacing: 0.04em;
+}
+td { width: 68%; }
+p { margin: 0.5em 0; }
+hr {
+  border: none;
+  border-top: 1px solid #d6d4ce;
+  margin: 1.4em 0;
+}
+strong { font-weight: 700; }

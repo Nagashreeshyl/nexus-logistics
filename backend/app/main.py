@@ -43,6 +43,10 @@ _SCENARIO_CONTENT_FP: dict[str, str] = {}
 _LOCALHOST_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5173",
+    "http://127.0.0.1:5174",
+    "http://localhost:5174",
+    "http://127.0.0.1:5175",
+    "http://localhost:5175",
 ]
 _ENV_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 _CORS_ORIGINS = list(dict.fromkeys([*_LOCALHOST_ORIGINS, *_ENV_ORIGINS]))
@@ -51,7 +55,8 @@ app = FastAPI(title="JP-019 Nexus Last-Mile", version="2.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # Vite may hop ports when 5173 is busy; also allow any local Vite origin.
+    allow_origin_regex=r"https://.*\.vercel\.app|http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,9 +230,12 @@ class LabRunBody(BaseModel):
 
 
 @app.post("/api/lab/synthetic")
-def lab_synthetic(seed: int | None = Query(default=None)) -> dict[str, Any]:
+def lab_synthetic(
+    seed: int | None = Query(default=None),
+    archetype: str | None = Query(default=None),
+) -> dict[str, Any]:
     """Generate a NEW Bengaluru CVRPTW scenario and persist it as `lab` (same APIs as Day A/B)."""
-    scenario, payload = generate_lab_scenario(seed)
+    scenario, payload = generate_lab_scenario(seed, archetype=archetype)
     scenario.id = LAB_SCENARIO_ID
     db.replace_scenario(
         scenario,

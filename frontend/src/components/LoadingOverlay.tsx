@@ -9,7 +9,7 @@ const STAGES = [
 ];
 
 interface LoadingOverlayProps {
-  mode: "baseline" | "optimize" | "compare" | "synthetic" | "breakdown" | null;
+  mode: "baseline" | "optimize" | "compare" | "synthetic" | "breakdown" | "rush" | null;
   stageIndex: number;
 }
 
@@ -24,7 +24,9 @@ export function LoadingOverlay({ mode, stageIndex }: LoadingOverlayProps) {
           ? "Generating synthetic day"
           : mode === "breakdown"
             ? "Reoptimizing after vehicle breakdown"
-            : "Optimizing routes";
+            : mode === "rush"
+              ? "Injecting rush order and reoptimizing"
+              : "Optimizing routes";
   const active = Math.min(stageIndex, STAGES.length - 1);
 
   return (

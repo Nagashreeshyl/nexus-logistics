@@ -76,7 +76,13 @@ def run_optimize(
     params.local_search_metaheuristic = 2
     params.time_limit.FromSeconds(time_limit_s)
 
-    solution = routing.SolveWithParameters(params)
+    try:
+        solution = routing.SolveWithParameters(params)
+    except Exception:
+        # OR-Tools can raise (e.g. "CP Solver fail") on rare model/search faults —
+        # treat as hard infeasibility instead of 500'ing the Lab.
+        solution = None
+
     assignments: dict[str, list[str]] = {v.vehicle_id: [] for v in vehicles}
     served: set[str] = set()
     log: list[ConstraintEvent] = []

@@ -1,4 +1,4 @@
-/** Persist Lab run metrics for Presentation slides 7–9 + return navigation. */
+/** Persist Lab run metrics for Presentation (measured / Lab / disruption / checklist) + return navigation. */
 
 const KEY = "nexus-lab-session-v1";
 

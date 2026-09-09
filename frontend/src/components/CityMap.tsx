@@ -18,6 +18,8 @@ interface CityMapProps {
   hoverVehicle: string | null;
   playMin: number | null;
   unavailableVehicleIds?: string[];
+  /** Hide OSM badge / tighter chrome for dual-pane compare. */
+  compact?: boolean;
   onSelect: (orderId: string) => void;
   onFocusVehicle?: (vehicleId: string | null) => void;
 }
@@ -92,6 +94,7 @@ export function CityMap({
   hoverVehicle,
   playMin,
   unavailableVehicleIds = [],
+  compact = false,
   onSelect,
   onFocusVehicle,
 }: CityMapProps) {
@@ -281,17 +284,21 @@ export function CityMap({
     [];
 
   return (
-    <div className="relative h-full min-h-[480px] overflow-hidden border border-hairline bg-snow">
-      <div ref={ref} className="h-full min-h-[480px] w-full" />
-      <p className="pointer-events-none absolute right-3 top-3 z-[500] border border-ink bg-snow px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink">
-        OSM · Bengaluru
-      </p>
-      <MapLegend
-        vehicleIds={legendVehicleIds}
-        focusVehicle={focusVehicle}
-        unavailableVehicleIds={unavailableVehicleIds}
-        onSelectVehicle={onFocusVehicle}
-      />
+    <div className={`relative h-full overflow-hidden border border-hairline bg-snow ${compact ? "min-h-[360px]" : "min-h-[480px]"}`}>
+      <div ref={ref} className={`h-full w-full ${compact ? "min-h-[360px]" : "min-h-[480px]"}`} />
+      {!compact && (
+        <p className="pointer-events-none absolute bottom-3 left-3 z-[500] border border-ink bg-snow px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-ink">
+          OSM · Bengaluru
+        </p>
+      )}
+      {!compact && (
+        <MapLegend
+          vehicleIds={legendVehicleIds}
+          focusVehicle={focusVehicle}
+          unavailableVehicleIds={unavailableVehicleIds}
+          onSelectVehicle={onFocusVehicle}
+        />
+      )}
       {playMin != null && (
         <p className="pointer-events-none absolute bottom-3 right-3 z-[500] border border-ink bg-snow px-3 py-1 font-mono text-[12px] font-semibold">
           Play · {String(Math.floor(playMin / 60)).padStart(2, "0")}:{String(playMin % 60).padStart(2, "0")}

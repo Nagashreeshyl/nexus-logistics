@@ -1,10 +1,13 @@
 frontend/
 frontend/.vercel/
 .venv/
+.venv-backend/
+venv/
 .git/
 docs/
 *.pdf
 **/__pycache__/
+**/.pytest_cache/
 backend/tests/
 backend/data/cache/
 backend/data/nexus.db
@@ -15,3 +18,5 @@ secrets/
 Dockerfile
 docker-compose.yml
 fly.toml
+**/*.md
+!requirements-vercel.txt

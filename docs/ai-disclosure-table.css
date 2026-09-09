@@ -1,0 +1,87 @@
+@page {
+  size: A4;
+  margin: 24mm 20mm;
+}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.45;
+  color: #0a0a0a;
+  margin: 0;
+}
+
+/* Single page title — injected via CSS so pandoc does not duplicate H1 */
+body::before {
+  content: "7.1 AI Disclosure";
+  display: block;
+  font-size: 20pt;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 3px solid #f47c59;
+}
+
+p {
+  margin: 0 0 18px 0;
+  color: #555;
+  font-size: 10.5pt;
+  max-width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 10.5pt;
+}
+
+thead th {
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 9.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid #1a1a1a;
+  vertical-align: middle;
+}
+
+tbody td {
+  border: 1px solid #c8c6c0;
+  padding: 12px 14px;
+  vertical-align: top;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+tbody tr:nth-child(even) td {
+  background: #f7f6f2;
+}
+
+tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+/* Column widths */
+th:first-child,
+td:first-child {
+  width: 32%;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: #fff5f2 !important;
+}
+
+th:last-child,
+td:last-child {
+  width: 68%;
+  font-weight: 400;
+}
+
+tbody td:first-child {
+  border-right: 1px solid #c8c6c0;
+}
