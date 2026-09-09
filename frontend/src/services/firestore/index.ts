@@ -1,8 +1,14 @@
 /**
  * Firestore data-access layer.
- * Keep queries here — not in UI components.
+ * Keep queries / writes here — not in UI components.
  */
-export { subscribeToDocument, subscribeToQuery, userDocRef } from "./subscribe";
+export {
+  subscribeToCollection,
+  subscribeToDocument,
+  subscribeToQuery,
+  orgCollectionQuery,
+  userDocRef,
+} from "./subscribe";
 export {
   ensureUserProfileShell,
   getCurrentUserProfile,
@@ -11,3 +17,11 @@ export {
   updateActiveRole,
 } from "./users";
 export { getDrivers, getOrders, getVehicles } from "./entities";
+export {
+  createException,
+  markNotificationRead,
+  reassignDelivery,
+  touchPresence,
+  transitionDeliveryStatus,
+} from "./operations";
+export { seedRealtimeDemo } from "./seedRealtimeDemo";

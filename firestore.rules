@@ -170,5 +170,15 @@ service cloud.firestore {
       allow read: if signedIn() && inOrg(resource.data.organizationId) && isAnalyst();
       allow write: if signedIn() && isDispatcher();
     }
+
+    // In-app notifications (FCM later). Users read/update own docs only.
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId is string
+        && request.resource.data.organizationId is string;
+      allow update: if signedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
   }
 }

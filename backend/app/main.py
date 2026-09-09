@@ -158,7 +158,7 @@ def health() -> dict[str, Any]:
     fb_ok = firebase_configured()
     return {
         "ok": True,
-        "version": "2.3.0",
+        "version": "2.4.0",
         "firebase": {
             "configured": fb_ok,
             "initialized": init_firebase() if fb_ok else False,
@@ -187,6 +187,8 @@ def health() -> dict[str, Any]:
             "ops-repository",
             "rbac",
             "active-role-switch",
+            "realtime-firestore",
+            "delivery-state-machine",
         ],
     }
 

@@ -59,6 +59,9 @@ export interface NexusUser {
   driverId: string | null;
   organizationId: string;
   status: string;
+  /** Presence heartbeat — label as Last active, not Online. */
+  lastSeenAt?: unknown;
+  lastActiveRole?: string | null;
 }
 
 export function normalizeRoles(raw: unknown): Role[] {
@@ -93,5 +96,7 @@ export function mapUserDoc(uid: string, data: Record<string, unknown>): NexusUse
     driverId: (data.driverId as string | null) ?? null,
     organizationId: String(data.organizationId ?? "nexus-demo"),
     status: String(data.status ?? "active"),
+    lastSeenAt: data.lastSeenAt,
+    lastActiveRole: (data.lastActiveRole as string | null) ?? null,
   };
 }

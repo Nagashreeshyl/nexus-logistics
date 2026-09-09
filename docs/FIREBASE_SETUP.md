@@ -106,3 +106,7 @@ VITE_USE_FIREBASE_EMULATOR=true
 ## Compatibility note
 
 OR-Tools pins `protobuf==5.26.1`. Backend uses `firebase-admin==6.5.0` verified to import Auth + Firestore with that pin. Do not upgrade `google-cloud-firestore` to versions that require protobuf ≥6 without validating OR-Tools.
+
+## Realtime (V2.4)
+
+After Auth works, use Dispatcher **Realtime Test Console** (dev) to seed synthetic deliveries, then verify Driver ↔ Dispatcher updates without refresh. Details: `docs/REALTIME_ARCHITECTURE.md`.

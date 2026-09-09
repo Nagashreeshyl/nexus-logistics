@@ -38,3 +38,8 @@ cd backend && ../.venv/bin/python scripts/provision_demo_users.py
 ```
 
 Passwords are never stored in the repo.
+
+## Realtime (V2.4)
+
+Operational dashboards subscribe with Firestore `onSnapshot` (see `docs/REALTIME_ARCHITECTURE.md`).  
+Authorization for listener results still comes from Security Rules + `roles[]`, never `activeRole`.
