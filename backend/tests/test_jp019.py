@@ -172,3 +172,16 @@ def test_api_compare_and_winsheet():
     rm = client.get("/api/risk/metrics")
     assert rm.status_code == 200
     assert "metrics" in rm.json()
+
+
+def test_ops_health_without_forcing_firebase():
+    r = client.get("/api/ops/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert "firebase_configured" in body
+    assert "message" in body
+
+
+def test_ops_me_requires_auth():
+    r = client.get("/api/ops/me")
+    assert r.status_code == 401

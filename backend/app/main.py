@@ -27,12 +27,13 @@ from .models import (
     SolveRequest,
 )
 from .nominatim import reverse as nominatim_reverse
+from .ops_api import router as ops_router
 from .optimizer import run_optimize
 from .firebase_app import firebase_configured, init_firebase
 from .risk import DATA_DISCLOSURE, RiskModel
 from .weather import fetch_weather
 
-app = FastAPI(title="JP-019 Nexus Last-Mile", version="2.1.0")
+app = FastAPI(title="JP-019 Nexus Last-Mile", version="2.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -40,6 +41,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(ops_router)
 
 risk_model = RiskModel()
 WEATHER: dict[str, Any] = {}
@@ -156,7 +158,7 @@ def health() -> dict[str, Any]:
     fb_ok = firebase_configured()
     return {
         "ok": True,
-        "version": "2.1.0",
+        "version": "2.2.0",
         "firebase": {
             "configured": fb_ok,
             "initialized": init_firebase() if fb_ok else False,
@@ -182,6 +184,7 @@ def health() -> dict[str, Any]:
             "weather-refresh",
             "solve-history",
             "firebase-foundation",
+            "ops-repository",
         ],
     }
 
