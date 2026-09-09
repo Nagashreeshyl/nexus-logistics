@@ -52,3 +52,5 @@ backend/data/cache/
 
 # Optional local Redis dump
 dump.rdb
+.vercel
+.env*.local

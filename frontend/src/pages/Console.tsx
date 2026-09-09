@@ -27,7 +27,7 @@ import { BrandLogo } from "../components/BrandLogo";
 import { VehicleRail } from "../components/VehicleRail";
 import { WinSheetPanel } from "../components/WinSheetPanel";
 import { fmtClock } from "../lib/format";
-import { loadSyntheticScenario, runLabOptimize, type LabScenarioPayload } from "../lib/labApi";
+import { loadSyntheticScenario } from "../lib/labApi";
 import type { Metrics, ScenarioDetail, Solution, SolveMode, Stop, Weather } from "../types";
 
 interface ConsoleProps {
@@ -35,54 +35,12 @@ interface ConsoleProps {
 }
 
 type BusyMode = SolveMode | "compare" | "synthetic" | null;
-type DayId = "a" | "b" | "synthetic";
-
-function labToScenarioDetail(s: LabScenarioPayload): ScenarioDetail {
-  return {
-    id: s.scenario_id,
-    code: s.code,
-    name: s.name,
-    depot: s.depot,
-    depot_address: s.depot_address,
-    held: [],
-    weather: null,
-    orders: s.orders.map((o) => ({
-      order_id: o.order_id,
-      lat: o.lat,
-      lon: o.lon,
-      demand: o.demand,
-      tw_start: o.tw_start,
-      tw_end: o.tw_end,
-      service_min: o.service_min,
-      priority: o.priority,
-      zone: o.zone,
-      zone_name: o.zone,
-      customer: o.customer,
-      address: o.address,
-      pincode: "",
-      phone: "",
-      sku: "",
-      cod_inr: 0,
-    })),
-    vehicles: s.vehicles.map((v) => ({
-      vehicle_id: v.vehicle_id,
-      capacity: v.capacity,
-      depot_lat: v.depot_lat,
-      depot_lon: v.depot_lon,
-      shift_start: v.shift_start,
-      shift_end: v.shift_end,
-      driver: v.driver,
-      plate: v.plate,
-      phone: "",
-      rating: 0,
-      depot_address: s.depot_address,
-    })),
-  };
-}
+/** Day packs a/b plus live synthetic pack persisted as SQLite id `lab`. */
+type DayId = "a" | "b" | "lab";
 
 export function Console({ onBack }: ConsoleProps) {
   const [scenarioId, setScenarioId] = useState<DayId>("a");
-  const [labPayload, setLabPayload] = useState<LabScenarioPayload | null>(null);
+  const [labGenerationId, setLabGenerationId] = useState<string | null>(null);
   const [scenario, setScenario] = useState<ScenarioDetail | null>(null);
   const [scenarioLoading, setScenarioLoading] = useState(true);
   const [solution, setSolution] = useState<Solution | null>(null);
@@ -116,7 +74,7 @@ export function Console({ onBack }: ConsoleProps) {
   const [winOpen, setWinOpen] = useState(false);
   const [disclosure, setDisclosure] = useState<string>("");
 
-  const isSynthetic = scenarioId === "synthetic";
+  const isLab = scenarioId === "lab";
 
   useEffect(() => {
     const t = window.setInterval(() => setClock(new Date()), 1000);
@@ -168,9 +126,7 @@ export function Console({ onBack }: ConsoleProps) {
   }, []);
 
   useEffect(() => {
-    if (scenarioId === "synthetic") return;
     let cancelled = false;
-    setLabPayload(null);
     setSolution(null);
     setSelectedId(null);
     setError(null);
@@ -179,8 +135,17 @@ export function Console({ onBack }: ConsoleProps) {
     setPlaying(false);
     setComparisonRows([]);
     setTravelPair(null);
+    if (scenarioId !== "lab") setLabGenerationId(null);
     Promise.all([reloadScenario(scenarioId), reloadHistory(scenarioId)]).catch((e: Error) => {
-      if (!cancelled) setError(e.message);
+      if (!cancelled) {
+        if (scenarioId === "lab") {
+          setError("No synthetic day yet — click Synthetic day to generate one.");
+          setScenario(null);
+          setScenarioLoading(false);
+        } else {
+          setError(e.message);
+        }
+      }
     });
     return () => {
       cancelled = true;
@@ -200,14 +165,14 @@ export function Console({ onBack }: ConsoleProps) {
     setPlaying(false);
     try {
       const payload = await loadSyntheticScenario();
-      setLabPayload(payload);
-      setScenario(labToScenarioDetail(payload));
-      setScenarioId("synthetic");
-      setHistory([]);
+      setLabGenerationId(payload.generation_id ?? `lab-${payload.seed.toString(16)}`);
+      setScenarioId("lab");
+      await reloadScenario("lab");
+      await reloadHistory("lab");
       setBriefing([
         "Fresh synthetic Bengaluru day loaded (new every click).",
         `${payload.summary.orders} orders · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical · demand ${payload.summary.total_demand}.`,
-        "Run Compare both or Smart optimize — same OR-Tools + risk engines as Day A/B.",
+        "Run Compare both or Smart optimize — same engines as Day A/B.",
       ]);
       setToast(
         `Synthetic day ready · ${payload.summary.orders} stops · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical`,
@@ -219,7 +184,7 @@ export function Console({ onBack }: ConsoleProps) {
       setScenarioLoading(false);
       setSolving(null);
     }
-  }, []);
+  }, [reloadScenario, reloadHistory]);
 
   const run = useCallback(
     async (mode: SolveMode) => {
@@ -228,31 +193,11 @@ export function Console({ onBack }: ConsoleProps) {
       setPlaying(false);
       setPlayMin(null);
       try {
-        let result: Solution;
-        if (scenarioId === "synthetic") {
-          if (!labPayload) throw new Error("Load a synthetic day first");
-          const lab = await runLabOptimize({
-            scenario_id: labPayload.scenario_id,
-            orders: labPayload.orders,
-            vehicles: labPayload.vehicles,
-            depot_lat: labPayload.depot[0],
-            depot_lon: labPayload.depot[1],
-          });
-          result = mode === "baseline" ? lab.baseline : lab.optimize;
-          if (mode === "baseline") {
-            setBaselines((prev) => ({ ...prev, synthetic: lab.baseline.metrics }));
-          } else {
-            setBaselines((prev) => ({ ...prev, synthetic: lab.baseline.metrics }));
-          }
-          setTravelPair(lab.travel_source);
-          setDisclosure(lab.data_disclosure ?? "");
-        } else {
-          result = await solve(scenarioId, mode);
-          if (mode === "baseline") {
-            setBaselines((prev) => ({ ...prev, [scenarioId]: result.metrics }));
-          }
-          await reloadHistory(scenarioId);
+        const result = await solve(scenarioId, mode);
+        if (mode === "baseline") {
+          setBaselines((prev) => ({ ...prev, [scenarioId]: result.metrics }));
         }
+        await reloadHistory(scenarioId);
         setSolution(result);
         if (result.weather) setWeather(result.weather);
         setBriefing([
@@ -272,7 +217,7 @@ export function Console({ onBack }: ConsoleProps) {
         setSolving(null);
       }
     },
-    [scenarioId, labPayload, reloadHistory],
+    [scenarioId, reloadHistory],
   );
 
   useEffect(() => {
@@ -283,12 +228,13 @@ export function Console({ onBack }: ConsoleProps) {
       }
       if (e.key === "1") setScenarioId("a");
       if (e.key === "2") setScenarioId("b");
+      if (e.key === "3") void loadNewSynthetic();
       if (e.key === "b" && !e.metaKey && !e.ctrlKey) void run("baseline");
       if (e.key === "o" && !e.metaKey && !e.ctrlKey) void run("optimize");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [run]);
+  }, [run, loadNewSynthetic]);
 
   useEffect(() => {
     if (!playing || !solution) return;
@@ -311,53 +257,19 @@ export function Console({ onBack }: ConsoleProps) {
     setError(null);
     setPlaying(false);
     try {
-      if (scenarioId === "synthetic") {
-        if (!labPayload) throw new Error("Load a synthetic day first");
-        const lab = await runLabOptimize({
-          scenario_id: labPayload.scenario_id,
-          orders: labPayload.orders,
-          vehicles: labPayload.vehicles,
-          depot_lat: labPayload.depot[0],
-          depot_lon: labPayload.depot[1],
-        });
-        setBaselines((prev) => ({ ...prev, synthetic: lab.baseline.metrics }));
-        setSolution(lab.optimize);
-        setComparisonRows(
-          (lab.comparison ?? []).map((r) => ({
-            metric: r.metric,
-            key: r.key,
-            baseline: r.baseline,
-            optimized: r.optimized,
-            delta: r.delta,
-            improvement_pct: r.improvement_pct,
-            better_when: r.better_when ?? "lower",
-          })),
-        );
-        setTravelPair(lab.travel_source ?? null);
-        setDisclosure(lab.data_disclosure ?? "");
-        if (lab.optimize.weather) setWeather(lab.optimize.weather);
-        const lateDelta = lab.optimize.metrics.late_count - lab.baseline.metrics.late_count;
-        const distDelta = Math.round((lab.optimize.metrics.distance_km - lab.baseline.metrics.distance_km) * 100) / 100;
-        setBriefing([
-          "Compared naive vs smart on this synthetic day.",
-          ...(lab.improvements?.slice(0, 3) ?? []),
-          `Late Δ ${lateDelta} · Distance Δ ${distDelta} km.`,
-        ]);
-      } else {
-        const result = await compare(scenarioId);
-        setBaselines((prev) => ({ ...prev, [scenarioId]: result.baseline.metrics }));
-        setSolution(result.optimize);
-        setComparisonRows(result.comparison ?? []);
-        setTravelPair(result.travel_source ?? null);
-        setDisclosure(result.data_disclosure ?? "");
-        if (result.optimize.weather) setWeather(result.optimize.weather);
-        setBriefing([
-          "Compared naive vs smart on the same day.",
-          ...(result.improvements?.slice(0, 3) ?? []),
-          `Late Δ ${result.deltas.late_count} · Distance Δ ${result.deltas.distance_km} km.`,
-        ]);
-        await reloadHistory(scenarioId);
-      }
+      const result = await compare(scenarioId);
+      setBaselines((prev) => ({ ...prev, [scenarioId]: result.baseline.metrics }));
+      setSolution(result.optimize);
+      setComparisonRows(result.comparison ?? []);
+      setTravelPair(result.travel_source ?? null);
+      setDisclosure(result.data_disclosure ?? "");
+      if (result.optimize.weather) setWeather(result.optimize.weather);
+      setBriefing([
+        isLab ? "Compared naive vs smart on this synthetic day." : "Compared naive vs smart on the same day.",
+        ...(result.improvements?.slice(0, 3) ?? []),
+        `Late Δ ${result.deltas.late_count} · Distance Δ ${result.deltas.distance_km} km.`,
+      ]);
+      await reloadHistory(scenarioId);
       setToast("Comparison complete. See the improvement table.");
       setShowHelp(false);
     } catch (e) {
@@ -365,15 +277,11 @@ export function Console({ onBack }: ConsoleProps) {
     } finally {
       setSolving(null);
     }
-  }, [scenarioId, labPayload, reloadHistory]);
+  }, [scenarioId, isLab, reloadHistory]);
 
   const onHold = useCallback(
     async (nextHeld: boolean) => {
       if (!selectedId) return;
-      if (scenarioId === "synthetic") {
-        setToast("Holds apply to Day A/B packs only — switch day or re-run without holds.");
-        return;
-      }
       try {
         const res = await setHold(scenarioId, selectedId, nextHeld);
         setHeld(res.held);
@@ -388,10 +296,6 @@ export function Console({ onBack }: ConsoleProps) {
   );
 
   const onClearHolds = useCallback(async () => {
-    if (scenarioId === "synthetic") {
-      setToast("Holds apply to Day A/B packs only.");
-      return;
-    }
     try {
       const res = await clearHolds(scenarioId);
       setHeld(res.held);
@@ -469,12 +373,8 @@ export function Console({ onBack }: ConsoleProps) {
   return (
     <div className="min-h-dvh bg-paper px-4 py-5 text-ink sm:px-6">
       <LoadingOverlay mode={solving} stageIndex={stage} />
-      <WinSheetPanel
-        scenarioId={scenarioId === "synthetic" ? "a" : scenarioId}
-        open={winOpen && !isSynthetic}
-        onClose={() => setWinOpen(false)}
-      />
-      {exportKind && !isSynthetic && (
+      <WinSheetPanel scenarioId={scenarioId} open={winOpen} onClose={() => setWinOpen(false)} />
+      {exportKind && (
         <ExportViewer kind={exportKind} scenarioId={scenarioId} mode={mode} onClose={() => setExportKind(null)} />
       )}
       {toast && (
@@ -529,7 +429,7 @@ export function Console({ onBack }: ConsoleProps) {
               <li>
                 <span className="font-semibold text-ink">Pick a day</span>
                 <br />
-                Day A = normal. Day B = too many stops (shows deferred work).
+                Day A = normal. Day B = too many stops. Synthetic day = fresh random Bengaluru data every click.
               </li>
               <li>
                 <span className="font-semibold text-ink">Run Naive plan</span>
@@ -579,16 +479,16 @@ export function Console({ onBack }: ConsoleProps) {
                   onClick={() => void loadNewSynthetic()}
                   title="Generate a NEW random Bengaluru scenario (different every click)"
                   className={`inline-flex min-h-11 items-center gap-1.5 border-l border-hairline px-4 font-sans text-[13px] font-semibold disabled:opacity-40 ${
-                    isSynthetic ? "bg-coral text-ink" : "bg-snow text-mute hover:text-ink"
+                    isLab ? "bg-coral text-ink" : "bg-snow text-mute hover:text-ink"
                   }`}
                 >
                   <Sparkles size={15} />
-                  {solving === "synthetic" ? "Generating…" : isSynthetic ? "New synthetic day" : "Synthetic day"}
+                  {solving === "synthetic" ? "Generating…" : isLab ? "New synthetic day" : "Synthetic day"}
                 </button>
               </div>
-              {isSynthetic && labPayload && (
+              {isLab && labGenerationId && (
                 <p className="mt-1.5 font-mono text-[11px] text-mute">
-                  {labPayload.scenario_id} · click again for a different day
+                  {labGenerationId} · click again for a different day
                 </p>
               )}
             </div>
@@ -627,19 +527,19 @@ export function Console({ onBack }: ConsoleProps) {
             </button>
             <button
               type="button"
-              disabled={busy || isSynthetic}
+              disabled={busy}
               onClick={() => setExportKind("csv")}
               className={btn}
-              title={isSynthetic ? "Driver sheet uses Day A/B packs" : "Open a clean driver sheet you can download"}
+              title="Open a clean driver sheet you can download"
             >
               <Download size={15} /> Driver sheet
             </button>
             <button
               type="button"
-              disabled={busy || isSynthetic}
+              disabled={busy}
               onClick={() => setExportKind("geojson")}
               className={btn}
-              title={isSynthetic ? "Map export uses Day A/B packs" : "Open map data preview for GIS tools"}
+              title="Open map data preview for GIS tools"
             >
               <MapIcon size={15} /> Map export
             </button>
@@ -647,10 +547,10 @@ export function Console({ onBack }: ConsoleProps) {
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={busy || isSynthetic}
+                disabled={busy}
                 onClick={() => setWinOpen(true)}
                 className={btn}
-                title={isSynthetic ? "Win sheet uses Day A/B packs" : "Open judge-facing win sheet with measured results"}
+                title="Open judge-facing win sheet with measured results"
               >
                 <FileText size={15} /> Win sheet
               </button>
@@ -700,7 +600,7 @@ export function Console({ onBack }: ConsoleProps) {
 
         <GuideBanner
           hasSolution={Boolean(solution)}
-          scenarioId={scenarioId === "synthetic" ? "a" : scenarioId}
+          scenarioId={scenarioId === "lab" ? "a" : scenarioId}
           onBaseline={() => void run("baseline")}
           onOptimize={() => void run("optimize")}
           onCompare={() => void runCompare()}
@@ -771,7 +671,7 @@ export function Console({ onBack }: ConsoleProps) {
         )}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.9fr)]">
-          <div className="relative min-h-[520px]">
+          <div className="relative min-h-[520px] overflow-hidden">
             {!solution && !busy && (
               <div className="pointer-events-none absolute inset-x-4 top-14 z-10 border border-ink/20 bg-snow/95 p-3 font-sans text-[13px] text-mute">
                 Map shows today’s stops. After you run a plan, colored lines are each van’s route. Click a stop for
@@ -797,7 +697,7 @@ export function Console({ onBack }: ConsoleProps) {
               />
             )}
           </div>
-          <div className="flex max-h-[760px] flex-col gap-3 overflow-y-auto pr-1">
+          <div className="flex max-h-[min(760px,70vh)] flex-col gap-3 overflow-y-auto pr-1">
             <p className="font-sans text-[12px] font-semibold uppercase tracking-wide text-mute">Vans & drivers</p>
             <VehicleRail
               routes={idleRoutes}

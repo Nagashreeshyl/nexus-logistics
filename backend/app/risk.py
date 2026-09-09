@@ -166,8 +166,40 @@ class RiskModel:
             except Exception:
                 # Pickle/sklearn version skew — retrain rather than crash startup.
                 pass
-        self.meta = train_and_evaluate(persist=True)
-        self._apply_blob(joblib.load(MODEL_PATH))
+        # Serverless: package tree may be read-only — train into /tmp when needed.
+        try:
+            self.meta = train_and_evaluate(persist=True)
+            self._apply_blob(joblib.load(MODEL_PATH))
+        except OSError:
+            import os
+
+            tmp_dir = Path(os.environ.get("NEXUS_DATA_DIR", "/tmp/nexus-data")) / "models"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_model = tmp_dir / "late_risk.joblib"
+            # train_and_evaluate always writes MODEL_PATH; do a local in-memory fit instead.
+            self.meta = train_and_evaluate(persist=False)
+            df = pd.read_csv(HISTORY_PATH)
+            train_df, _ = train_test_split(
+                df, test_size=0.25, random_state=19, stratify=df["was_late"]
+            )
+            zone_rates = train_df.groupby("zone")["was_late"].mean().to_dict()
+            train_df = train_df.copy()
+            train_df["zone_late_rate"] = train_df["zone"].map(zone_rates).fillna(0.28)
+            clf, _ = _fit_clf(train_df[FEATURES], train_df["was_late"])
+            pre_clf, _ = _fit_clf(train_df[PRE_ROUTE_FEATURES], train_df["was_late"])
+            blob = {
+                "version": ARTIFACT_VERSION,
+                "clf": clf,
+                "pre_clf": pre_clf,
+                "zone_rates": zone_rates,
+                "features": FEATURES,
+                "pre_route_features": PRE_ROUTE_FEATURES,
+            }
+            try:
+                joblib.dump(blob, tmp_model)
+            except OSError:
+                pass
+            self._apply_blob(blob)
 
     def evaluation(self) -> dict[str, Any]:
         return {

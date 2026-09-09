@@ -1,32 +1,54 @@
-# Vercel deployment (frontend)
+# Vercel deployment (frontend + FastAPI) — free Hobby, no Fly/Docker required
 
-Nexus Logistics V2 frontend deploys as a Vite SPA on Vercel.
+Nexus Logistics deploys **only on Vercel**:
+
+1. **Frontend** — Vite SPA (`frontend/` project) → e.g. `https://nexusaidecisionengine.vercel.app`
+2. **Backend** — FastAPI as a Vercel Python Function (repo root `main.py`) → separate Vercel project
+
+Do **not** use Fly.io, Railway paid plans, or other paid hosts for the default path.
 
 ## Important limits
 
-- **Vercel hosts the React app only** (Auth + Firestore work in the browser).
-- The **FastAPI / OR-Tools backend is not deployed by this Vercel project**.
-- For Optimize / Lab APIs, set `VITE_API_BASE_URL` to a publicly reachable FastAPI URL (HTTPS).
-- Do **not** set `VITE_API_BASE_URL=http://127.0.0.1:8000` in Vercel.
+- Optimize / Lab need the **Python** Vercel project (`VITE_API_BASE_URL`).
+- OR-Tools + sklearn must stay under the Python function bundle limit (~500MB). Use `requirements-vercel.txt`.
+- SQLite Lab DB uses `/tmp/nexus-data` on Vercel (ephemeral per instance — fine for demo; cold starts re-seed Day A/B).
+- Default travel mode on Vercel: `JP019_TRAVEL=haversine` (no OSRM dependency).
 
-## Backend URL + CORS
+## 1) Deploy the API (repo root)
 
-1. Deploy FastAPI (Docker / Fly.io skeleton: root `Dockerfile` + `fly.toml`, app `nexus-logistics-api`).
-2. In Vercel, set `VITE_API_BASE_URL` to that HTTPS origin (no trailing slash), e.g. `https://nexus-logistics-api.fly.dev`.
-3. On the API host, set `CORS_ORIGINS` to a comma-separated allowlist of your production frontend origins (e.g. `https://your-app.vercel.app`). Localhost `:5173` is always included; `https://*.vercel.app` is also allowed via regex.
+```bash
+cd "<repo-root>"
+vercel login
+vercel link          # create/link project e.g. nexus-logistics-api
+vercel env add JP019_TRAVEL production   # value: haversine
+vercel env add NEXUS_DATA_DIR production # value: /tmp/nexus-data
+vercel --prod
+```
 
-Without a reachable backend + CORS, Optimize / exports show “API offline / unavailable (404)” rather than a blank failure.
+Copy the production URL (e.g. `https://nexus-logistics-api.vercel.app`).
 
-## Project settings
+## 2) Point the frontend at the API
+
+In the **frontend** Vercel project → Settings → Environment Variables:
+
+```text
+VITE_API_BASE_URL=https://<your-api-project>.vercel.app
+```
+
+(No trailing slash.) Redeploy frontend after changing env:
+
+```bash
+cd frontend
+vercel --prod
+```
+
+## Frontend project settings
 
 - Root directory: `frontend`
-- Build command: `npm run build`
+- Build: `npm run build`
 - Output: `dist`
-- Framework preset: Vite
 
-## Environment variables (Production)
-
-Set in Vercel → Project → Settings → Environment Variables:
+## Frontend env (Production)
 
 ```text
 VITE_FIREBASE_API_KEY
@@ -35,22 +57,30 @@ VITE_FIREBASE_PROJECT_ID
 VITE_FIREBASE_STORAGE_BUCKET
 VITE_FIREBASE_MESSAGING_SENDER_ID
 VITE_FIREBASE_APP_ID
-VITE_API_BASE_URL   # required for Optimize / Lab / export APIs
+VITE_API_BASE_URL   # HTTPS origin of the FastAPI Vercel project
 ```
+
+## CORS
+
+Backend already allows `https://*.vercel.app`. Optionally set `CORS_ORIGINS` to your exact frontend origin.
 
 ## Firebase Auth authorized domains
 
-In Firebase Console → Authentication → Settings → Authorized domains, add:
+Add:
 
 - `localhost`
-- your Vercel domain (e.g. `nexus-logistics.vercel.app`)
+- your frontend Vercel domain (e.g. `nexusaidecisionengine.vercel.app`)
 
-## CLI deploy
+## Local demo (optional)
+
+```bash
+JP019_TRAVEL=haversine PYTHONPATH=backend uvicorn app.main:app --port 8000
+cd frontend && npm run dev
+```
+
+## CLI — frontend only
 
 ```bash
 cd frontend
-vercel login
-vercel link
-vercel env pull   # or set env in dashboard
 vercel --prod
 ```

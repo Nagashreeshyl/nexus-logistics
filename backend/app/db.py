@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -11,7 +12,10 @@ from typing import Any, Iterator
 
 from .models import Order, Scenario, Vehicle
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+# Packaged seed CSVs / ML assets (read-only on serverless).
+SEED_DIR = Path(__file__).resolve().parents[1] / "data"
+# Writable DB dir — use /tmp on Vercel (ephemeral but Lab-safe).
+DATA_DIR = Path(os.environ.get("NEXUS_DATA_DIR", str(SEED_DIR)))
 DB_PATH = DATA_DIR / "nexus.db"
 
 SCENARIO_META = {
@@ -118,7 +122,7 @@ def _g(row: dict, key: str, default: str = "") -> str:
 
 def _seed(conn: sqlite3.Connection) -> None:
     for sid, (code, name) in SCENARIO_META.items():
-        folder = DATA_DIR / f"scenario_{sid}"
+        folder = SEED_DIR / f"scenario_{sid}"
         conn.execute("INSERT OR REPLACE INTO scenarios(id, code, name) VALUES (?,?,?)", (sid, code, name))
         with (folder / "vehicles.csv").open() as f:
             for r in csv.DictReader(f):

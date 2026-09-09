@@ -1,5 +1,5 @@
 import type { RoutePlan } from "../types";
-import { VEHICLE_COLORS } from "../types";
+import { vehicleColor } from "../lib/vehicleStyle";
 import { fmtClock } from "../lib/format";
 
 interface VehicleRailProps {
@@ -15,7 +15,7 @@ export function VehicleRail({ routes, hoverVehicle, onHover, onSelectStop, selec
     <div className="flex flex-col gap-3">
       {routes.map((route) => {
         const pct = Math.min(100, Math.round((route.load / Math.max(route.capacity, 1)) * 100));
-        const color = VEHICLE_COLORS[route.vehicle_id] ?? "#0A0A0A";
+        const color = vehicleColor(route.vehicle_id);
         const active = hoverVehicle === route.vehicle_id;
         return (
           <article
@@ -26,8 +26,11 @@ export function VehicleRail({ routes, hoverVehicle, onHover, onSelectStop, selec
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="sys">Van // {route.vehicle_id}</p>
-                <h3 className="mt-1 font-display text-[22px] font-medium text-ink">{route.driver || route.vehicle_id}</h3>
+                <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-mute">
+                  <span className="inline-block h-2.5 w-2.5" style={{ background: color }} aria-hidden />
+                  Van · {route.vehicle_id}
+                </p>
+                <h3 className="mt-1 font-sans text-[20px] font-semibold text-ink">{route.driver || route.vehicle_id}</h3>
                 <p className="font-mono text-[11px] text-mute">
                   {route.plate}
                   {route.rating ? ` · ${route.rating.toFixed(1)}★` : ""}
@@ -65,12 +68,14 @@ export function VehicleRail({ routes, hoverVehicle, onHover, onSelectStop, selec
                     type="button"
                     onClick={() => onSelectStop(s.order_id)}
                     className={`flex w-full items-center justify-between px-2 py-1.5 text-left text-[13px] ${
-                      selectedId === s.order_id ? "bg-lavender text-ink" : "text-mute hover:bg-lavender hover:text-ink"
+                      selectedId === s.order_id ? "bg-paper text-ink" : "text-mute hover:bg-paper hover:text-ink"
                     }`}
                   >
                     <span className="truncate pr-2">
                       {s.seq}. {s.customer || s.order_id}
-                      {s.priority === "critical" ? " · CRITICAL" : ""}
+                      {s.priority === "critical" ? (
+                        <span className="ml-1 font-semibold text-coral">CRITICAL</span>
+                      ) : null}
                     </span>
                     <span className={`shrink-0 font-mono text-[11px] ${s.late || s.breach ? "text-coral" : "text-ink"}`}>
                       {fmtClock(s.eta_min)}

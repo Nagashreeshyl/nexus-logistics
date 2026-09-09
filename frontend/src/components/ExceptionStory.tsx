@@ -1,4 +1,5 @@
 import type { ConstraintEvent, Metrics, Unassigned } from "../types";
+import { formatConstraintReason } from "../lib/constraintReason";
 
 interface ExceptionStoryProps {
   partial: boolean;
@@ -16,7 +17,7 @@ export function ExceptionStory({ partial, unassigned, log, metrics, heldCount }:
 
   const deferredCrit = unassigned.filter((u) => u.priority === "critical").length;
   const deferredNorm = unassigned.filter((u) => u.priority === "normal").length;
-  const reasonSample = log.slice(0, 3).map((c) => c.reason);
+  const reasonSample = log.slice(0, 3).map((c) => formatConstraintReason(c.reason));
 
   return (
     <section className="border border-coral bg-snow px-4 py-4" aria-label="Exception handling">

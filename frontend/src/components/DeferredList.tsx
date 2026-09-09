@@ -1,6 +1,7 @@
 import type { ConstraintEvent, Unassigned } from "../types";
 import { ShapeMark } from "./ShapeMark";
 import { fmtClock } from "../lib/format";
+import { formatConstraintReason } from "../lib/constraintReason";
 
 interface DeferredListProps {
   items: Unassigned[];
@@ -14,7 +15,7 @@ export function DeferredList({ items, reasons = [], onSelect }: DeferredListProp
     <section className="border border-hairline bg-snow p-4">
       <div className="flex items-center gap-2">
         <ShapeMark name="exception" className="h-3.5 w-3.5 text-coral" />
-        <h3 className="sys text-ink">Deferred / unassigned</h3>
+        <h3 className="font-sans text-[12px] font-semibold uppercase tracking-wide text-ink">Deferred / unassigned</h3>
       </div>
       <p className="mt-1 font-sans text-[11px] text-mute">
         Inspect → hold/release → re-solve. Criticals are protected when capacity runs out.
@@ -28,16 +29,18 @@ export function DeferredList({ items, reasons = [], onSelect }: DeferredListProp
               <button
                 type="button"
                 onClick={() => onSelect(u.order_id)}
-                className="flex w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-[13px] hover:bg-lavender"
+                className="flex w-full items-start justify-between gap-2 border border-transparent px-2 py-1.5 text-left text-[13px] hover:border-hairline hover:bg-paper"
               >
-                <span>
+                <span className="min-w-0">
                   <span className="text-ink">{u.customer || u.order_id}</span>
                   <span className="block font-mono text-[11px] text-mute">
                     {u.zone_name || u.zone}
                     {u.priority === "critical" ? " · CRITICAL" : ""}
                   </span>
                   {reasonOf[u.order_id] && (
-                    <span className="mt-0.5 block font-mono text-[10px] text-coral">{reasonOf[u.order_id]}</span>
+                    <span className="mt-0.5 block font-sans text-[11px] leading-snug text-coral">
+                      {formatConstraintReason(reasonOf[u.order_id])}
+                    </span>
                   )}
                 </span>
                 <span className="shrink-0 font-mono text-[11px] text-coral">due {fmtClock(u.tw_end)}</span>
