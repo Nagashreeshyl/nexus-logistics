@@ -11,6 +11,8 @@
     "lint": "tsc --noEmit",
     "test:roles": "npx --yes tsx src/lib/roles.selftest.ts",
     "test:delivery": "npx --yes tsx src/lib/deliveryStatus.selftest.ts",
+    "test:ops": "npx --yes tsx src/lib/opsValidation.selftest.ts",
+
     "firebase:emulators": "npx -y firebase-tools@latest emulators:start --only auth,firestore"
   },
   "dependencies": {

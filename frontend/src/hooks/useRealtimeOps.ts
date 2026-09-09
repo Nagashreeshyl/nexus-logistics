@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { OpsDelivery, OpsDriver, OpsException, OpsOrder, OpsVehicle, SyncConnectionState } from "../lib/opsTypes";
+import type { OpsCustomer, OpsDelivery, OpsDriver, OpsException, OpsOrder, OpsVehicle, SyncConnectionState } from "../lib/opsTypes";
 import { getFirebase } from "../firebase/config";
 import { subscribeToCollection, subscribeToDocument } from "../services/firestore/subscribe";
 
@@ -124,6 +124,14 @@ export function useRealtimeRoutes(organizationId: string | null | undefined) {
 
 export function useRealtimeExceptions(organizationId: string | null | undefined) {
   return useRealtimeOrgCollection<OpsException>("exceptions", organizationId);
+}
+
+export function useRealtimeCustomers(organizationId: string | null | undefined) {
+  return useRealtimeOrgCollection<OpsCustomer>("customers", organizationId);
+}
+
+export function useRealtimeOptimizationRuns(organizationId: string | null | undefined) {
+  return useRealtimeOrgCollection("optimizationRuns", organizationId);
 }
 
 /** Merge connection states — live only if all live. */

@@ -1,11 +1,15 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuth } from "../firebase/AuthProvider";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { ROLE_LABEL, Role, WORKSPACE_IDENTITY } from "../lib/roles";
+import { useAuth } from "../firebase/AuthProvider";
+import { useRealtimeOrganization } from "../hooks/useRealtimeOps";
+import { LiveSyncBadge, formatLastSeen } from "../components/ops/OpsBadges";
 import { DispatcherOpsPage } from "./DispatcherOpsPage";
 import { DriverOpsPage } from "./DriverOpsPage";
 import { RealtimeTestConsolePage } from "./RealtimeTestConsolePage";
-import { useRealtimeOrganization } from "../hooks/useRealtimeOps";
-import { LiveSyncBadge, formatLastSeen } from "../components/ops/OpsBadges";
+import { FleetPage } from "./FleetPage";
+import { CustomersPage } from "./CustomersPage";
+import { DriversPage, DriverDetailPage } from "./DriversPage";
+import { OrdersPage } from "./OrdersPage";
 
 function WorkspaceHeader({ role }: { role: Role }) {
   const identity = WORKSPACE_IDENTITY[role];
@@ -29,8 +33,8 @@ function ProfileCard({ role }: { role: Role }) {
         <LiveSyncBadge connection={orgQ.connection} />
       </div>
       <p className="max-w-[62ch] font-sans text-[14px] text-mute">
-        Workspace identity for {ROLE_LABEL[role]}. Operational management pages arrive in later milestones; Auth,
-        RBAC, and realtime remain active.
+        {ROLE_LABEL[role]} workspace — operational modules use live Firestore. Authorization uses roles[]; activeRole is
+        presentation only.
       </p>
       <dl className="mt-6 grid gap-3 border border-hairline bg-snow p-5 font-mono text-[12px] sm:grid-cols-2">
         <div>
@@ -65,12 +69,38 @@ function ProfileCard({ role }: { role: Role }) {
   );
 }
 
+function DriverDetailRoute({ basePath }: { basePath: string }) {
+  const { driverId } = useParams();
+  if (!driverId) return <Navigate to={basePath} replace />;
+  return <DriverDetailPage driverId={driverId} basePath={basePath} />;
+}
+
 export function AdminHome() {
-  return <ProfileCard role="admin" />;
+  return (
+    <Routes>
+      <Route index element={<ProfileCard role="admin" />} />
+      <Route path="fleet" element={<FleetPage />} />
+      <Route path="drivers" element={<DriversPage basePath="/admin/drivers" />} />
+      <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/admin/drivers" />} />
+      <Route path="customers" element={<CustomersPage />} />
+      <Route path="orders" element={<OrdersPage />} />
+      <Route path="*" element={<Navigate to="." replace />} />
+    </Routes>
+  );
 }
 
 export function AnalystHome() {
-  return <ProfileCard role="analyst" />;
+  return (
+    <Routes>
+      <Route index element={<ProfileCard role="analyst" />} />
+      <Route path="orders" element={<OrdersPage readOnly />} />
+      <Route path="fleet" element={<FleetPage readOnly />} />
+      <Route path="drivers" element={<DriversPage readOnly basePath="/analyst/drivers" />} />
+      <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/analyst/drivers" />} />
+      <Route path="customers" element={<CustomersPage readOnly />} />
+      <Route path="*" element={<Navigate to="." replace />} />
+    </Routes>
+  );
 }
 
 export function DispatcherHome() {
@@ -87,6 +117,12 @@ export function DispatcherHome() {
           </div>
         }
       />
+      <Route path="orders" element={<OrdersPage />} />
+      <Route path="deliveries" element={<DispatcherOpsPage />} />
+      <Route path="fleet" element={<FleetPage />} />
+      <Route path="drivers" element={<DriversPage basePath="/dispatcher/drivers" />} />
+      <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/dispatcher/drivers" />} />
+      <Route path="customers" element={<CustomersPage />} />
       <Route path="realtime-lab" element={<RealtimeTestConsolePage />} />
       <Route path="*" element={<Navigate to="." replace />} />
     </Routes>

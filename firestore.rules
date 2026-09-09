@@ -151,8 +151,11 @@ service cloud.firestore {
     }
 
     match /optimizationRuns/{id} {
-      allow read: if signedIn() && inOrg(resource.data.organizationId) && isAnalyst();
-      allow write: if signedIn() && isDispatcher();
+      allow read: if signedIn() && inOrg(resource.data.organizationId)
+        && (isDispatcher() || isAnalyst() || isAdmin());
+      allow create: if signedIn() && isDispatcher()
+        && inOrg(request.resource.data.organizationId);
+      allow update, delete: if isAdmin();
     }
 
     match /auditLogs/{id} {

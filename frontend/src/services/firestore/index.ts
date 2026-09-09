@@ -25,3 +25,24 @@ export {
   transitionDeliveryStatus,
 } from "./operations";
 export { seedRealtimeDemo } from "./seedRealtimeDemo";
+export {
+  createVehicle,
+  updateVehicle,
+  deactivateVehicle,
+  createDriver,
+  updateDriver,
+  deactivateDriver,
+  assignDriverVehicle,
+  unassignDriverVehicle,
+  createCustomer,
+  updateCustomer,
+  deactivateCustomer,
+  createOrder,
+  cancelOrder,
+  assignOrderDelivery,
+  generateSyntheticVehicle,
+  generateSyntheticDriver,
+  generateSyntheticCustomer,
+  generateSyntheticOrder,
+  generateOperationalScenario,
+} from "./entityCrud";
