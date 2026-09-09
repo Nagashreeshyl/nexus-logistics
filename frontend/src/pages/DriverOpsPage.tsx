@@ -8,9 +8,9 @@ import { transitionDeliveryStatus } from "../services/firestore/operations";
 import { DriverRouteMap } from "../components/ops/DriverRouteMap";
 
 const PRIMARY_LABEL: Partial<Record<DeliveryStatus, string>> = {
-  EN_ROUTE: "Start delivery",
+  EN_ROUTE: "Start Delivery",
   ARRIVED: "Arrived",
-  DELIVERED: "Complete delivery",
+  DELIVERED: "Complete",
 };
 
 export function DriverOpsPage() {
@@ -79,6 +79,20 @@ export function DriverOpsPage() {
         </div>
         <LiveSyncBadge connection={connection} />
       </div>
+
+      {deliveriesQ.loading && (
+        <p className="mt-4 font-sans text-[13px] text-mute">Synchronizing deliveries…</p>
+      )}
+      {(connection === "offline" || connection === "error") && (
+        <p className="mt-4 border border-hairline bg-snow px-3 py-2 font-sans text-[13px] text-mute">
+          Connection issue — unable to synchronize. Do not treat this route as live.
+        </p>
+      )}
+      {connection === "permission_denied" && (
+        <p className="mt-4 border border-coral bg-snow px-3 py-2 font-sans text-[13px] text-coral">
+          Permission denied — unable to load your deliveries.
+        </p>
+      )}
 
       {(error || deliveriesQ.error) && (
         <p className="mt-4 border border-coral bg-snow px-3 py-2 font-sans text-[13px] text-coral">

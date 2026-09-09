@@ -33,6 +33,14 @@ service cloud.firestore {
       return hasRole('driver') || isAdmin();
     }
 
+    function isSyntheticResource() {
+      return resource.data.keys().has('synthetic') && resource.data.synthetic == true;
+    }
+
+    function canDeleteOps() {
+      return isAdmin() || (isDispatcher() && isSyntheticResource());
+    }
+
     // Clients may change presentation fields only — never roles / org / status.
     function userSelfSafeUpdate() {
       return request.auth.uid == request.resource.data.uid
@@ -80,7 +88,7 @@ service cloud.firestore {
         && (isDispatcher() || isAnalyst() || (isDriver() && resource.data.userId == request.auth.uid));
       allow create, update: if signedIn() && isDispatcher()
         && inOrg(request.resource.data.organizationId);
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /vehicles/{id} {
@@ -88,13 +96,14 @@ service cloud.firestore {
         && (isDispatcher() || isAnalyst() || isDriver());
       allow create, update: if signedIn() && isDispatcher()
         && inOrg(request.resource.data.organizationId);
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /customers/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || isAdmin());
-      allow write: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow create, update: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow delete: if canDeleteOps();
     }
 
     match /orders/{id} {
@@ -106,7 +115,7 @@ service cloud.firestore {
         (isDispatcher() && inOrg(request.resource.data.organizationId))
         || (isDriver() && resource.data.assignedDriverUserId == request.auth.uid)
       );
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /routes/{id} {
@@ -114,6 +123,7 @@ service cloud.firestore {
         && (isDispatcher() || isAnalyst() || isAdmin()
             || (isDriver() && resource.data.driverUserId == request.auth.uid));
       allow write: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow delete: if canDeleteOps();
     }
 
     match /stops/{id} {
@@ -124,19 +134,20 @@ service cloud.firestore {
         (isDispatcher() && inOrg(request.resource.data.organizationId))
         || (isDriver() && resource.data.driverUserId == request.auth.uid)
       );
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /deliveries/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || isAdmin()
             || (isDriver() && resource.data.driverUserId == request.auth.uid));
-      allow create: if signedIn() && isDispatcher();
-      allow update: if signedIn() && (
+      allow create: if signedIn() && isDispatcher()
+        && inOrg(request.resource.data.organizationId);
+      allow update: if signedIn() && inOrg(resource.data.organizationId) && (
         isDispatcher()
         || (isDriver() && resource.data.driverUserId == request.auth.uid)
       );
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /exceptions/{id} {
@@ -144,10 +155,10 @@ service cloud.firestore {
         && (isDispatcher() || isAnalyst() || isAdmin()
             || (isDriver() && resource.data.driverUserId == request.auth.uid));
       allow create, update: if signedIn() && (
-        isDispatcher()
+        (isDispatcher() && inOrg(request.resource.data.organizationId))
         || (isDriver() && resource.data.driverUserId == request.auth.uid)
       );
-      allow delete: if isAdmin();
+      allow delete: if canDeleteOps();
     }
 
     match /optimizationRuns/{id} {
@@ -159,7 +170,8 @@ service cloud.firestore {
     }
 
     match /auditLogs/{id} {
-      allow read: if signedIn() && inOrg(resource.data.organizationId) && isAdmin();
+      allow read: if signedIn() && inOrg(resource.data.organizationId)
+        && (isAdmin() || isAnalyst());
       allow create: if signedIn();
       allow update, delete: if false;
     }

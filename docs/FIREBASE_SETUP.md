@@ -37,6 +37,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 ## 5. Service account (backend Admin SDK)
 
+**Required for** `POST /api/ops/optimize-live` (ID token verification) and Admin Firestore access.
+
 1. Project settings → Service accounts → Generate new private key  
 2. Save as `secrets/firebase-service-account.json` (gitignored)  
 3. Backend `.env`:

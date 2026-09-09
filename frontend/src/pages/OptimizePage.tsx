@@ -4,6 +4,7 @@ import { useAuth } from "../firebase/AuthProvider";
 import {
   mergeConnection,
   useRealtimeDrivers,
+  useRealtimeOptimizationRuns,
   useRealtimeOrders,
   useRealtimeVehicles,
 } from "../hooks/useRealtimeOps";
@@ -11,6 +12,12 @@ import { OpsPageShell, MetricGrid } from "../components/ops/OpsPageShell";
 import { useToast } from "../components/ops/useToast";
 import { getFirebase } from "../firebase/config";
 import { assignOrderDelivery } from "../services/firestore/entityCrud";
+import { formatLastSeen } from "../components/ops/OpsBadges";
+
+function metric(v: unknown): string | number {
+  if (v === null || v === undefined || (typeof v === "number" && Number.isNaN(v))) return "N/A";
+  return v as string | number;
+}
 
 export function OptimizePage() {
   const { profile, firebaseUser, getIdToken, can } = useAuth();
@@ -18,10 +25,12 @@ export function OptimizePage() {
   const ordersQ = useRealtimeOrders(orgId);
   const vehiclesQ = useRealtimeVehicles(orgId);
   const driversQ = useRealtimeDrivers(orgId);
-  const connection = mergeConnection(ordersQ.connection, vehiclesQ.connection);
+  const runsQ = useRealtimeOptimizationRuns(orgId);
+  const connection = mergeConnection(ordersQ.connection, vehiclesQ.connection, runsQ.connection);
   const { show, toastEl } = useToast();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Record<string, any> | null>(null);
+  const [optError, setOptError] = useState<string | null>(null);
 
   const openOrders = useMemo(
     () => ordersQ.data.filter((o) => !["COMPLETED", "CANCELLED", "FAILED"].includes(String(o.status))),
@@ -41,6 +50,7 @@ export function OptimizePage() {
       return;
     }
     setBusy(true);
+    setOptError(null);
     try {
       const token = await getIdToken();
       if (!token) throw new Error("Missing Firebase ID token");
@@ -82,7 +92,7 @@ export function OptimizePage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || res.statusText);
+        throw new Error(typeof body.detail === "string" ? body.detail : res.statusText);
       }
       const data = await res.json();
       setResult(data);
@@ -99,6 +109,8 @@ export function OptimizePage() {
           explanations: data.explanations ?? [],
           feasible: data.feasible,
           partial: data.partial,
+          ordersConsidered: openOrders.length,
+          vehiclesConsidered: availableVehicles.length,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           createdBy: firebaseUser.uid,
@@ -106,7 +118,9 @@ export function OptimizePage() {
       }
       show("Optimization complete — result written to Firestore");
     } catch (e) {
-      show(e instanceof Error ? e.message : String(e), "err");
+      const msg = e instanceof Error ? e.message : String(e);
+      setOptError(msg);
+      show(msg, "err");
     } finally {
       setBusy(false);
     }
@@ -138,7 +152,6 @@ export function OptimizePage() {
   }
 
   const opt = result?.optimize?.metrics;
-  const base = result?.baseline?.metrics;
 
   return (
     <OpsPageShell
@@ -152,11 +165,24 @@ export function OptimizePage() {
           className="bg-coral px-4 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
           onClick={() => void runOptimize()}
         >
-          {busy ? "Running…" : "Optimize Deliveries"}
+          {busy ? "Optimization running…" : "Optimize with Nexus AI"}
         </button>
       }
     >
       {toastEl}
+      {(ordersQ.loading || vehiclesQ.loading) && (
+        <p className="mt-4 font-sans text-[13px] text-mute">Loading live fleet and orders…</p>
+      )}
+      {optError && (
+        <p className="mt-4 border border-coral bg-snow px-3 py-2 font-sans text-[13px] text-coral">
+          Optimization failed: {optError}
+        </p>
+      )}
+      {(connection === "offline" || connection === "error") && (
+        <p className="mt-4 border border-hairline bg-snow px-3 py-2 font-sans text-[13px] text-mute">
+          Connection issue — unable to synchronize. Do not treat inputs as live.
+        </p>
+      )}
       <MetricGrid
         items={[
           ["Open orders", openOrders.length],
@@ -165,6 +191,12 @@ export function OptimizePage() {
           ["Ready", openOrders.length && availableVehicles.length ? "Yes" : "No"],
         ]}
       />
+
+      {openOrders.length === 0 && !ordersQ.loading && (
+        <p className="mt-4 font-sans text-[13px] text-mute">
+          No open orders — generate a demo scenario from Scenario Studio first.
+        </p>
+      )}
 
       <section className="mt-6 border border-hairline bg-snow p-4 font-sans text-[13px] text-mute">
         <p className="font-semibold text-ink">Constraints (hard)</p>
@@ -180,7 +212,7 @@ export function OptimizePage() {
       {result && (
         <section className="mt-8 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-sans text-[18px] font-semibold">AI recommended plan</h2>
+            <h2 className="font-sans text-[18px] font-semibold">Baseline vs Nexus AI</h2>
             <span className="font-mono text-[12px] text-mute">
               {result.feasible ? "FEASIBLE" : "INFEASIBLE"} · {result.partial ? "PARTIALLY FEASIBLE" : "FULL"}
             </span>
@@ -190,18 +222,20 @@ export function OptimizePage() {
               className="border border-ink px-3 py-2 font-sans text-[13px] font-semibold"
               onClick={() => void applyPlan()}
             >
-              Apply assignments to Firestore
+              Approve plan
             </button>
           </div>
 
           <MetricGrid
             items={[
-              ["Vehicles used", opt?.vehicles_used ?? "—"],
-              ["Distance km", opt?.distance_km ?? "—"],
-              ["Late", opt?.late_count ?? "—"],
-              ["Deferred", opt?.unassigned_count ?? "—"],
-              ["Criticals served", opt?.criticals_served ?? "—"],
-              ["Utilization", opt?.capacity_utilization ?? "—"],
+              ["Orders considered", openOrders.length],
+              ["Vehicles used", metric(opt?.vehicles_used)],
+              ["Distance km", metric(opt?.distance_km)],
+              ["Late deliveries", metric(opt?.late_count)],
+              ["TW breaches", metric(opt?.hard_breaches)],
+              ["Deferred", metric(opt?.unassigned_count)],
+              ["Criticals served", metric(opt?.criticals_served)],
+              ["Utilization", metric(opt?.capacity_utilization)],
             ]}
           />
 
@@ -220,9 +254,9 @@ export function OptimizePage() {
                 {(result.comparison ?? []).map((row: any) => (
                   <tr key={row.key} className="border-b border-hairline/70">
                     <td className="px-3 py-2">{row.metric}</td>
-                    <td className="px-3 py-2">{row.baseline}</td>
-                    <td className="px-3 py-2 font-semibold">{row.optimized}</td>
-                    <td className="px-3 py-2">{row.delta}</td>
+                    <td className="px-3 py-2">{metric(row.baseline)}</td>
+                    <td className="px-3 py-2 font-semibold">{metric(row.optimized)}</td>
+                    <td className="px-3 py-2">{metric(row.delta)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -230,12 +264,19 @@ export function OptimizePage() {
           </div>
 
           <div className="border border-hairline bg-snow p-4">
-            <p className="sys">Explainability</p>
+            <p className="sys">Risk / explainability</p>
             <ul className="mt-2 space-y-1 font-sans text-[13px] text-mute">
+              {(result.explanations ?? []).length === 0 && <li>N/A</li>}
               {(result.explanations ?? []).map((line: string) => (
                 <li key={line}>• {line}</li>
               ))}
             </ul>
+            {result.ml_metrics?.pre_route_metrics?.roc_auc != null && (
+              <p className="mt-3 font-mono text-[11px] text-mute">
+                ML pre-route AUC {result.ml_metrics.pre_route_metrics.roc_auc} · post-route AUC{" "}
+                {result.ml_metrics.metrics?.roc_auc ?? "N/A"} (advisory only)
+              </p>
+            )}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -247,22 +288,31 @@ export function OptimizePage() {
                 <ol className="mt-2 list-decimal pl-4">
                   {(route.stops ?? []).map((s: any) => (
                     <li key={s.order_id}>
-                      {s.order_id} · ETA {s.eta_min}m · risk {s.risk?.p_late ?? "—"}
+                      {s.order_id} · ETA {s.eta_min != null ? `${s.eta_min}m` : "N/A"} · risk{" "}
+                      {s.risk?.p_late != null ? s.risk.p_late : "N/A"}
                     </li>
                   ))}
                 </ol>
               </div>
             ))}
           </div>
-
-          {base && (
-            <p className="font-mono text-[11px] text-mute">
-              Baseline late={base.late_count} distance={base.distance_km} · AI late={opt?.late_count} distance=
-              {opt?.distance_km}
-            </p>
-          )}
         </section>
       )}
+
+      <section className="mt-8">
+        <h2 className="font-sans text-[16px] font-semibold">Persisted optimization runs (Firestore)</h2>
+        <ul className="mt-3 space-y-2">
+          {runsQ.data.slice(0, 8).map((run: any) => (
+            <li key={run.id} className="border border-hairline bg-snow px-3 py-2 font-mono text-[12px]">
+              {run.mode ?? "run"} · {run.source ?? "—"} · feasible={String(run.feasible)} ·{" "}
+              {formatLastSeen(run.createdAt)}
+            </li>
+          ))}
+          {!runsQ.loading && runsQ.data.length === 0 && (
+            <li className="font-sans text-[13px] text-mute">No optimizationRuns yet.</li>
+          )}
+        </ul>
+      </section>
     </OpsPageShell>
   );
 }

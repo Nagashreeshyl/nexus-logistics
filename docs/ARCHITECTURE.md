@@ -18,7 +18,9 @@ Nexus Logistics
   → Analyst metrics + optimizationRuns audit
 ```
 
-See `docs/DEMO_RUNBOOK.md`, `docs/SECURITY.md`, `docs/TESTING.md`, `docs/REALTIME_ARCHITECTURE.md`.
+Hackathon presentation: `docs/HACKATHON_DEMO_RUNBOOK.md`.
+
+See also `docs/DEMO_RUNBOOK.md`, `docs/SECURITY.md`, `docs/TESTING.md`, `docs/REALTIME_ARCHITECTURE.md`.
 
 ---
 

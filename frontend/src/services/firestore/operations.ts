@@ -102,7 +102,8 @@ export async function transitionDeliveryStatus(params: {
             ? "DELIVERY_FAILED"
             : "DELIVERY_STATUS_CHANGED";
 
-  await writeAudit({
+  // Audit/notifications must not block the driver CTA — delivery write is the source of truth.
+  void writeAudit({
     organizationId: delivery.organizationId,
     actorUid,
     actorEmail,
@@ -110,20 +111,20 @@ export async function transitionDeliveryStatus(params: {
     entityType: "delivery",
     entityId: delivery.id,
     metadata: { from: delivery.status, to, orderId: delivery.orderId },
-  });
+  }).catch(() => undefined);
 
   const targets = new Set<string>(params.notifyUserIds ?? []);
   if (delivery.driverUserId) targets.add(delivery.driverUserId);
   for (const uid of targets) {
-    await pushNotification({
+    void pushNotification({
       organizationId: delivery.organizationId,
       userId: uid,
-      type: eventType,
-      title: `Delivery ${delivery.orderId}`,
-      body: `Status → ${to}`,
+      type: "delivery_status",
+      title: `Delivery ${to}`,
+      body: `${delivery.orderId} → ${to}`,
       entityType: "delivery",
       entityId: delivery.id,
-    });
+    }).catch(() => undefined);
   }
 }
 

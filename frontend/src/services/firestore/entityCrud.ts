@@ -29,7 +29,7 @@ function dbOrThrow() {
   return fb.db;
 }
 
-async function audit(
+function audit(
   organizationId: string,
   actorUid: string,
   actorEmail: string,
@@ -38,7 +38,8 @@ async function audit(
   entityId: string,
   metadata?: Record<string, unknown>,
 ) {
-  await addDoc(collection(dbOrThrow(), "auditLogs"), {
+  // Non-blocking — operational write is authoritative; audit must not stall demo CTAs.
+  void addDoc(collection(dbOrThrow(), "auditLogs"), {
     organizationId,
     actorId: actorUid,
     actorUid,
@@ -50,7 +51,7 @@ async function audit(
     metadata: metadata ?? {},
     timestamp: serverTimestamp(),
     createdAt: serverTimestamp(),
-  });
+  }).catch(() => undefined);
 }
 
 type Actor = { uid: string; email: string; organizationId: string };
@@ -470,14 +471,17 @@ export async function assignOrderDelivery(params: {
   return deliveryId;
 }
 
-function rnd(n: number) {
-  return Math.floor(Math.random() * n);
+function rnd(n: number, seed: { v: number }) {
+  // Deterministic LCG for hackathon demo reproducibility
+  seed.v = (seed.v * 1664525 + 1013904223) >>> 0;
+  return seed.v % n;
 }
 
-export async function generateSyntheticVehicle(actor: Actor): Promise<string> {
-  const type = VEHICLE_TYPES[rnd(VEHICLE_TYPES.length)];
+export async function generateSyntheticVehicle(actor: Actor, seed?: { v: number }): Promise<string> {
+  const s = seed ?? { v: Date.now() >>> 0 };
+  const type = VEHICLE_TYPES[rnd(VEHICLE_TYPES.length, s)];
   return createVehicle(actor, {
-    registrationNumber: `KA-${String(10 + rnd(90)).padStart(2, "0")}-SY-${100 + rnd(899)}`,
+    registrationNumber: `KA-${String(10 + rnd(90, s)).padStart(2, "0")}-SY-${100 + rnd(899, s)}`,
     vehicleType: type,
     capacityKg: type === "BIKE" ? 40 : type === "VAN" ? 800 : 1500,
     volumeCapacity: type === "BIKE" ? 0.5 : 6,
@@ -488,12 +492,13 @@ export async function generateSyntheticVehicle(actor: Actor): Promise<string> {
   });
 }
 
-export async function generateSyntheticDriver(actor: Actor, userId?: string | null): Promise<string> {
+export async function generateSyntheticDriver(actor: Actor, userId?: string | null, seed?: { v: number }): Promise<string> {
+  const s = seed ?? { v: Date.now() >>> 0 };
   const names = ["Asha Rao", "Ravi Kumar", "Meera Iyer", "Arjun Nair", "Priya Shah"];
   return createDriver(actor, {
-    name: names[rnd(names.length)],
-    phone: `9${800000000 + rnd(99999999)}`,
-    licenseNumber: `KA${100000 + rnd(899999)}`,
+    name: names[rnd(names.length, s)],
+    phone: `9${800000000 + rnd(99999999, s)}`,
+    licenseNumber: `KA${100000 + rnd(899999, s)}`,
     status: "AVAILABLE",
     shiftStart: "08:00",
     shiftEnd: "18:00",
@@ -502,19 +507,20 @@ export async function generateSyntheticDriver(actor: Actor, userId?: string | nu
   });
 }
 
-export async function generateSyntheticCustomer(actor: Actor): Promise<string> {
+export async function generateSyntheticCustomer(actor: Actor, seed?: { v: number }): Promise<string> {
+  const s = seed ?? { v: Date.now() >>> 0 };
   const names = ["Indiranagar Fresh", "Koramangala Mart", "HSR Foods", "Jayanagar Pharmacy", "Whitefield Hub"];
-  const baseLat = 12.97 + Math.random() * 0.05;
-  const baseLon = 77.59 + Math.random() * 0.05;
+  const baseLat = 12.97 + (rnd(50, s) / 1000);
+  const baseLon = 77.59 + (rnd(50, s) / 1000);
   return createCustomer(actor, {
-    name: names[rnd(names.length)],
+    name: names[rnd(names.length, s)],
     company: "Synthetic Retail",
-    phone: `9${700000000 + rnd(99999999)}`,
-    email: `customer${rnd(9999)}@synthetic.nexus`,
-    address: `${10 + rnd(90)} Demo Street, Bengaluru`,
+    phone: `9${700000000 + rnd(99999999, s)}`,
+    email: `customer${rnd(9999, s)}@synthetic.nexus`,
+    address: `${10 + rnd(90, s)} Demo Street, Bengaluru`,
     latitude: baseLat,
     longitude: baseLon,
-    zone: ["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"][rnd(5)],
+    zone: ["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"][rnd(5, s)],
     preferredDeliveryWindowStart: "09:00",
     preferredDeliveryWindowEnd: "12:00",
     notes: "Synthetic customer",
@@ -522,7 +528,8 @@ export async function generateSyntheticCustomer(actor: Actor): Promise<string> {
   });
 }
 
-export async function generateSyntheticOrder(actor: Actor, customer: OpsCustomer): Promise<string> {
+export async function generateSyntheticOrder(actor: Actor, customer: OpsCustomer, seed?: { v: number }): Promise<string> {
+  const s = seed ?? { v: Date.now() >>> 0 };
   return createOrder(actor, {
     customer,
     customerId: customer.id,
@@ -530,12 +537,12 @@ export async function generateSyntheticOrder(actor: Actor, customer: OpsCustomer
     destination: customer.address,
     latitude: customer.latitude,
     longitude: customer.longitude,
-    demandKg: 5 + rnd(40),
-    volume: 1 + rnd(5),
-    priority: ORDER_PRIORITIES[rnd(ORDER_PRIORITIES.length)],
+    demandKg: 5 + rnd(40, s),
+    volume: 1 + rnd(5, s),
+    priority: ORDER_PRIORITIES[rnd(ORDER_PRIORITIES.length, s)],
     timeWindowStart: customer.preferredDeliveryWindowStart ?? "09:00",
     timeWindowEnd: customer.preferredDeliveryWindowEnd ?? "17:00",
-    serviceDurationMinutes: 10 + rnd(20),
+    serviceDurationMinutes: 10 + rnd(20, s),
     requestedDate: new Date().toISOString().slice(0, 10),
     origin: "Nexus Depot",
     notes: "Synthetic order",
@@ -545,24 +552,24 @@ export async function generateSyntheticOrder(actor: Actor, customer: OpsCustomer
 
 export async function generateOperationalScenario(
   actor: Actor,
-  counts: { vehicles: number; drivers: number; customers: number; orders: number },
+  counts: { vehicles: number; drivers: number; customers: number; orders: number; seed?: number },
   linkUserId?: string | null,
 ): Promise<{ vehicleIds: string[]; driverIds: string[]; customerIds: string[]; orderIds: string[] }> {
+  const seed = { v: (counts.seed ?? 20260909) >>> 0 };
   const vehicleIds: string[] = [];
   const driverIds: string[] = [];
   const customerIds: string[] = [];
   const orderIds: string[] = [];
 
-  for (let i = 0; i < counts.vehicles; i++) vehicleIds.push(await generateSyntheticVehicle(actor));
+  for (let i = 0; i < counts.vehicles; i++) vehicleIds.push(await generateSyntheticVehicle(actor, seed));
   for (let i = 0; i < counts.drivers; i++) {
-    driverIds.push(await generateSyntheticDriver(actor, i === 0 ? linkUserId ?? null : null));
+    driverIds.push(await generateSyntheticDriver(actor, i === 0 ? linkUserId ?? null : null, seed));
   }
-  for (let i = 0; i < counts.customers; i++) customerIds.push(await generateSyntheticCustomer(actor));
+  for (let i = 0; i < counts.customers; i++) customerIds.push(await generateSyntheticCustomer(actor, seed));
 
   // Pair first N drivers/vehicles
   const pairN = Math.min(vehicleIds.length, driverIds.length);
   for (let i = 0; i < pairN; i++) {
-    // lightweight link without full assert if freshly created AVAILABLE
     await updateDoc(doc(dbOrThrow(), "drivers", driverIds[i]), {
       assignedVehicleId: vehicleIds[i],
       status: "ASSIGNED",
@@ -578,34 +585,26 @@ export async function generateOperationalScenario(
 
   for (let i = 0; i < counts.orders; i++) {
     const cid = customerIds[i % customerIds.length];
-    // customer docs just created — reconstruct minimal OpsCustomer
-    const customer: OpsCustomer = {
-      id: cid,
-      organizationId: actor.organizationId,
-      name: `Synthetic Customer ${i + 1}`,
-      address: "Synthetic address",
-      latitude: 12.97,
-      longitude: 77.59,
-      active: true,
-      preferredDeliveryWindowStart: "09:00",
-      preferredDeliveryWindowEnd: "17:00",
-    };
-    // Prefer using generate after fetch isn't available — createOrder needs real name/coords from createCustomer
-    // Re-create via generateSyntheticOrder requires full customer; fetch from last create path:
+    const lat = 12.95 + (rnd(60, seed) / 1000);
+    const lon = 77.58 + (rnd(60, seed) / 1000);
     orderIds.push(
       await createOrder(actor, {
         customer: {
-          ...customer,
+          id: cid,
+          organizationId: actor.organizationId,
           name: `Scenario Customer ${i + 1}`,
           address: `${20 + i} Scenario Rd, Bengaluru`,
-          latitude: 12.95 + Math.random() * 0.06,
-          longitude: 77.58 + Math.random() * 0.06,
+          latitude: lat,
+          longitude: lon,
+          active: true,
+          preferredDeliveryWindowStart: "09:00",
+          preferredDeliveryWindowEnd: "17:00",
         },
         customerId: cid,
         customerName: `Scenario Customer ${i + 1}`,
         destination: `${20 + i} Scenario Rd, Bengaluru`,
-        latitude: 12.95 + Math.random() * 0.06,
-        longitude: 77.58 + Math.random() * 0.06,
+        latitude: lat,
+        longitude: lon,
         demandKg: 8 + (i % 20),
         volume: 1,
         priority: ORDER_PRIORITIES[i % ORDER_PRIORITIES.length],

@@ -6,15 +6,18 @@ import { generateOperationalScenario } from "../services/firestore/entityCrud";
 import { collection, getDocs, query, where, writeBatch, doc } from "firebase/firestore";
 import { getFirebase } from "../firebase/config";
 
-const PRESETS: Record<string, { vehicles: number; drivers: number; customers: number; orders: number; blurb: string }> = {
-  "Normal Day": { vehicles: 4, drivers: 4, customers: 12, orders: 16, blurb: "Balanced day" },
-  "Busy Day": { vehicles: 6, drivers: 6, customers: 20, orders: 30, blurb: "High volume" },
-  "High Priority Day": { vehicles: 5, drivers: 5, customers: 15, orders: 22, blurb: "Many criticals" },
-  "Vehicle Breakdown": { vehicles: 5, drivers: 5, customers: 12, orders: 18, blurb: "Then mark a vehicle BREAKDOWN" },
-  "Late Delivery Risk": { vehicles: 4, drivers: 4, customers: 14, orders: 20, blurb: "Tight windows" },
-  "Capacity Stress": { vehicles: 3, drivers: 3, customers: 18, orders: 28, blurb: "Demand near fleet capacity" },
-  "Time Window Stress": { vehicles: 4, drivers: 4, customers: 16, orders: 24, blurb: "Overlapping windows" },
-  "Mixed Crisis": { vehicles: 5, drivers: 5, customers: 20, orders: 32, blurb: "Volume + risk + tight windows" },
+const PRESETS: Record<
+  string,
+  { vehicles: number; drivers: number; customers: number; orders: number; seed: number; blurb: string }
+> = {
+  "Normal Day": { vehicles: 4, drivers: 4, customers: 12, orders: 16, seed: 101, blurb: "Balanced day" },
+  "Busy Day": { vehicles: 6, drivers: 6, customers: 20, orders: 30, seed: 202, blurb: "High volume" },
+  "High Priority Day": { vehicles: 5, drivers: 5, customers: 15, orders: 22, seed: 303, blurb: "Many criticals" },
+  "Vehicle Breakdown": { vehicles: 5, drivers: 5, customers: 12, orders: 18, seed: 404, blurb: "Then mark a vehicle BREAKDOWN" },
+  "Late Delivery Risk": { vehicles: 4, drivers: 4, customers: 14, orders: 20, seed: 505, blurb: "Tight windows" },
+  "Capacity Stress": { vehicles: 3, drivers: 3, customers: 18, orders: 28, seed: 606, blurb: "Demand near fleet capacity" },
+  "Time Window Stress": { vehicles: 4, drivers: 4, customers: 16, orders: 24, seed: 707, blurb: "Overlapping windows" },
+  "Mixed Crisis": { vehicles: 5, drivers: 5, customers: 20, orders: 32, seed: 808, blurb: "Volume + risk + tight windows" },
 };
 
 export function ScenarioStudioPage() {
@@ -90,7 +93,7 @@ export function ScenarioStudioPage() {
   return (
     <OpsPageShell
       title="Synthetic Scenario Engine"
-      subtitle="One-click demo scenarios write through the same Firestore repositories as real ops data."
+      subtitle="One-click demo scenarios write through the same Firestore repositories as real ops data. Deterministic seeds keep the hackathon demo reliable."
       connection="live"
       actions={
         <button type="button" disabled={busy} className="border border-coral px-3 py-2 font-sans text-[13px] font-semibold text-coral" onClick={() => void resetSynthetic()}>
@@ -108,10 +111,11 @@ export function ScenarioStudioPage() {
             className="border border-hairline bg-snow p-4 text-left hover:border-ink disabled:opacity-40"
             onClick={() => void generate(name)}
           >
-            <p className="font-sans text-[14px] font-semibold">{name}</p>
+            <p className="font-sans text-[14px] font-semibold">Generate Demo Scenario</p>
+            <p className="mt-1 font-sans text-[13px] font-semibold text-ink">{name}</p>
             <p className="mt-1 font-sans text-[12px] text-mute">{preset.blurb}</p>
             <p className="mt-2 font-mono text-[11px] text-mute">
-              {preset.vehicles}v · {preset.drivers}d · {preset.customers}c · {preset.orders}o
+              {preset.vehicles}v · {preset.drivers}d · {preset.customers}c · {preset.orders}o · seed {preset.seed}
             </p>
           </button>
         ))}

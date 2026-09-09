@@ -108,7 +108,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (role: Role) => {
       if (!firebaseUser || !profile) return;
       // Authorization gate: must be in roles[]; activeRole is UX only.
-      await updateActiveRole(firebaseUser.uid, role, profile.roles);
+      // Bound wait — do not freeze workspace switching if Firestore is slow.
+      await Promise.race([
+        updateActiveRole(firebaseUser.uid, role, profile.roles),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 4000)),
+      ]);
     },
     [firebaseUser, profile],
   );

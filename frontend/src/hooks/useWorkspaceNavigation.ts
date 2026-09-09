@@ -27,17 +27,20 @@ export function useWorkspaceNavigation() {
       if (!profile) return;
       if (!canAccess(role)) return;
       const target = getRoleHomeRoute(role);
-      if (location.pathname === target || location.pathname.startsWith(`${target}/`)) {
+      const alreadyThere =
+        location.pathname === target || location.pathname.startsWith(`${target}/`);
+      if (alreadyThere) {
         if (profile.activeRole !== role) {
-          await setActiveRole(role);
+          void setActiveRole(role);
         }
         return;
       }
       setSwitching(true);
       switchingTo.current = role;
       try {
-        await setActiveRole(role);
+        // Navigate immediately so the demo never freezes if the activeRole write is slow.
         navigate(target);
+        void setActiveRole(role);
       } finally {
         setSwitching(false);
         switchingTo.current = null;
