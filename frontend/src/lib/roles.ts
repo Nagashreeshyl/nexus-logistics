@@ -70,9 +70,9 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
     { label: "Drivers", to: "/admin/drivers" },
     { label: "Customers", to: "/admin/customers" },
     { label: "Orders", to: "/admin/orders" },
-    { label: "Users", soon: true },
-    { label: "Organizations", soon: true },
-    { label: "Audit", soon: true },
+    { label: "Users", to: "/admin/users" },
+    { label: "Organizations", to: "/admin/organizations" },
+    { label: "Audit", to: "/admin/audit" },
   ],
   dispatcher: [
     { label: "Operations", to: "/dispatcher" },

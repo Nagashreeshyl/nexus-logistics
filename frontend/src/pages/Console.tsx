@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Cloud, Download, FileText, HelpCircle, Loader2, Map as MapIcon, Play, X } from "lucide-react";
+import { apiUrl } from "../lib/apiUrl";
 import {
   clearHolds,
   compare,
@@ -81,7 +82,7 @@ export function Console({ onBack }: ConsoleProps) {
   }, [toast]);
 
   useEffect(() => {
-    fetch("/api/health")
+    fetch(apiUrl("/api/health"))
       .then((r) => r.json())
       .then((h) => setCacheMode(h?.cache?.mode ? String(h.cache.mode) : ""))
       .catch(() => undefined);

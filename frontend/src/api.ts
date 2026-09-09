@@ -1,3 +1,4 @@
+import { apiUrl } from "./lib/apiUrl";
 import type { ScenarioDetail, Solution, SolveMode, Weather } from "./types";
 
 async function parse<T>(res: Response): Promise<T> {
@@ -15,19 +16,19 @@ async function parse<T>(res: Response): Promise<T> {
 }
 
 export function fetchScenario(id: string): Promise<ScenarioDetail> {
-  return fetch(`/api/scenarios/${id}`).then((r) => parse<ScenarioDetail>(r));
+  return fetch(apiUrl(`/api/scenarios/${id}`)).then((r) => parse<ScenarioDetail>(r));
 }
 
 export function fetchWeather(): Promise<Weather> {
-  return fetch("/api/weather").then((r) => parse<Weather>(r));
+  return fetch(apiUrl("/api/weather")).then((r) => parse<Weather>(r));
 }
 
 export function refreshWeather(): Promise<Weather> {
-  return fetch("/api/weather/refresh", { method: "POST" }).then((r) => parse<Weather>(r));
+  return fetch(apiUrl("/api/weather/refresh"), { method: "POST" }).then((r) => parse<Weather>(r));
 }
 
 export function solve(scenarioId: string, mode: SolveMode): Promise<Solution> {
-  return fetch("/api/solve", {
+  return fetch(apiUrl("/api/solve"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scenario_id: scenarioId, mode }),
@@ -76,7 +77,7 @@ export interface CompareResult {
 }
 
 export function compare(scenarioId: string): Promise<CompareResult> {
-  return fetch(`/api/compare?scenario_id=${scenarioId}`, { method: "POST" }).then((r) =>
+  return fetch(apiUrl(`/api/compare?scenario_id=${scenarioId}`), { method: "POST" }).then((r) =>
     parse<CompareResult>(r),
   );
 }
@@ -120,11 +121,11 @@ export interface WinSheet {
 }
 
 export function fetchWinSheet(scenarioId: string): Promise<WinSheet> {
-  return fetch(`/api/winsheet?scenario_id=${scenarioId}`).then((r) => parse<WinSheet>(r));
+  return fetch(apiUrl(`/api/winsheet?scenario_id=${scenarioId}`)).then((r) => parse<WinSheet>(r));
 }
 
 export function setHold(scenarioId: string, orderId: string, held: boolean): Promise<{ held: string[] }> {
-  return fetch("/api/holds", {
+  return fetch(apiUrl("/api/holds"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scenario_id: scenarioId, order_id: orderId, held }),
@@ -132,7 +133,9 @@ export function setHold(scenarioId: string, orderId: string, held: boolean): Pro
 }
 
 export function clearHolds(scenarioId: string): Promise<{ held: string[] }> {
-  return fetch(`/api/holds/${scenarioId}`, { method: "DELETE" }).then((r) => parse<{ held: string[] }>(r));
+  return fetch(apiUrl(`/api/holds/${scenarioId}`), { method: "DELETE" }).then((r) =>
+    parse<{ held: string[] }>(r),
+  );
 }
 
 export function fetchHistory(scenarioId: string): Promise<{
@@ -150,7 +153,7 @@ export function fetchHistory(scenarioId: string): Promise<{
     created_at: string;
   }[];
 }> {
-  return fetch(`/api/history?scenario_id=${scenarioId}&limit=8`).then((r) =>
+  return fetch(apiUrl(`/api/history?scenario_id=${scenarioId}&limit=8`)).then((r) =>
     parse<{
       items: {
         id: number;
@@ -170,9 +173,9 @@ export function fetchHistory(scenarioId: string): Promise<{
 }
 
 export function manifestUrl(scenarioId: string, mode: SolveMode): string {
-  return `/api/manifest?scenario_id=${scenarioId}&mode=${mode}`;
+  return apiUrl(`/api/manifest?scenario_id=${scenarioId}&mode=${mode}`);
 }
 
 export function geojsonUrl(scenarioId: string, mode: SolveMode): string {
-  return `/api/geojson?scenario_id=${scenarioId}&mode=${mode}`;
+  return apiUrl(`/api/geojson?scenario_id=${scenarioId}&mode=${mode}`);
 }

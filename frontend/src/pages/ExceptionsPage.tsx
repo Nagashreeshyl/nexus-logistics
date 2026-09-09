@@ -14,6 +14,7 @@ import { StatusBadge, formatLastSeen } from "../components/ops/OpsBadges";
 import { useToast } from "../components/ops/useToast";
 import { assignOrderDelivery, updateVehicle } from "../services/firestore/entityCrud";
 import { getFirebase } from "../firebase/config";
+import { apiUrl } from "../lib/apiUrl";
 
 function metric(v: unknown): string | number {
   if (v === null || v === undefined || Number.isNaN(v)) return "N/A";
@@ -92,7 +93,7 @@ export function ExceptionsPage() {
       }),
     };
 
-    const res = await fetch("/api/ops/optimize-live", {
+    const res = await fetch(apiUrl("/api/ops/optimize-live"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

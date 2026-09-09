@@ -11,6 +11,7 @@ import {
 import { OpsPageShell, MetricGrid } from "../components/ops/OpsPageShell";
 import { useToast } from "../components/ops/useToast";
 import { getFirebase } from "../firebase/config";
+import { apiUrl } from "../lib/apiUrl";
 import { assignOrderDelivery } from "../services/firestore/entityCrud";
 import { formatLastSeen } from "../components/ops/OpsBadges";
 
@@ -82,7 +83,7 @@ export function OptimizePage() {
           };
         }),
       };
-      const res = await fetch("/api/ops/optimize-live", {
+      const res = await fetch(apiUrl("/api/ops/optimize-live"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

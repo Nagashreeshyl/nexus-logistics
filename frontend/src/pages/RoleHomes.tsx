@@ -1,8 +1,5 @@
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
-import { ROLE_LABEL, Role, WORKSPACE_IDENTITY } from "../lib/roles";
-import { useAuth } from "../firebase/AuthProvider";
-import { useRealtimeOrganization } from "../hooks/useRealtimeOps";
-import { LiveSyncBadge, formatLastSeen } from "../components/ops/OpsBadges";
+import { Role, WORKSPACE_IDENTITY } from "../lib/roles";
 import { DispatcherOpsPage } from "./DispatcherOpsPage";
 import { DriverOpsPage } from "./DriverOpsPage";
 import { RealtimeTestConsolePage } from "./RealtimeTestConsolePage";
@@ -14,6 +11,10 @@ import { OptimizePage } from "./OptimizePage";
 import { ExceptionsPage } from "./ExceptionsPage";
 import { ScenarioStudioPage } from "./ScenarioStudioPage";
 import { AnalystDashboardPage } from "./AnalystDashboardPage";
+import { AdminDashboardPage } from "./AdminDashboardPage";
+import { AdminUsersPage } from "./AdminUsersPage";
+import { AdminOrganizationsPage } from "./AdminOrganizationsPage";
+import { AdminAuditPage } from "./AdminAuditPage";
 
 function WorkspaceHeader({ role }: { role: Role }) {
   const identity = WORKSPACE_IDENTITY[role];
@@ -26,53 +27,6 @@ function WorkspaceHeader({ role }: { role: Role }) {
   );
 }
 
-function ProfileCard({ role }: { role: Role }) {
-  const { profile, firebaseUser } = useAuth();
-  const orgQ = useRealtimeOrganization(profile?.organizationId);
-  if (!profile) return null;
-  return (
-    <main className="mx-auto max-w-[960px] px-4 py-8">
-      <div className="flex items-start justify-between gap-3">
-        <WorkspaceHeader role={role} />
-        <LiveSyncBadge connection={orgQ.connection} />
-      </div>
-      <p className="max-w-[62ch] font-sans text-[14px] text-mute">
-        {ROLE_LABEL[role]} workspace — operational modules use live Firestore. Authorization uses roles[]; activeRole is
-        presentation only.
-      </p>
-      <dl className="mt-6 grid gap-3 border border-hairline bg-snow p-5 font-mono text-[12px] sm:grid-cols-2">
-        <div>
-          <dt className="text-mute">UID</dt>
-          <dd className="text-ink">{firebaseUser?.uid}</dd>
-        </div>
-        <div>
-          <dt className="text-mute">Email</dt>
-          <dd className="text-ink">{profile.email}</dd>
-        </div>
-        <div>
-          <dt className="text-mute">Organization</dt>
-          <dd className="text-ink">
-            {profile.organizationId}
-            {orgQ.organization?.name ? ` · ${String(orgQ.organization.name)}` : ""}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-mute">Last active</dt>
-          <dd className="text-ink">{formatLastSeen(profile.lastSeenAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-mute">Authorized roles[]</dt>
-          <dd className="text-ink">{profile.roles.map((r) => ROLE_LABEL[r]).join(", ") || "(empty)"}</dd>
-        </div>
-        <div>
-          <dt className="text-mute">activeRole (workspace only)</dt>
-          <dd className="text-ink">{ROLE_LABEL[profile.activeRole]}</dd>
-        </div>
-      </dl>
-    </main>
-  );
-}
-
 function DriverDetailRoute({ basePath }: { basePath: string }) {
   const { driverId } = useParams();
   if (!driverId) return <Navigate to={basePath} replace />;
@@ -82,12 +36,15 @@ function DriverDetailRoute({ basePath }: { basePath: string }) {
 export function AdminHome() {
   return (
     <Routes>
-      <Route index element={<ProfileCard role="admin" />} />
+      <Route index element={<AdminDashboardPage />} />
       <Route path="fleet" element={<FleetPage />} />
       <Route path="drivers" element={<DriversPage basePath="/admin/drivers" />} />
       <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/admin/drivers" />} />
       <Route path="customers" element={<CustomersPage />} />
       <Route path="orders" element={<OrdersPage />} />
+      <Route path="users" element={<AdminUsersPage />} />
+      <Route path="organizations" element={<AdminOrganizationsPage />} />
+      <Route path="audit" element={<AdminAuditPage />} />
       <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );
