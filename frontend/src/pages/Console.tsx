@@ -22,7 +22,7 @@ import { GuideBanner } from "../components/GuideBanner";
 import { HistoryPanel } from "../components/HistoryPanel";
 import { LoadingOverlay } from "../components/LoadingOverlay";
 import { OrderBoard } from "../components/OrderBoard";
-import { RiskInspector } from "../components/RiskInspector";
+import { WhyThisRoute } from "../components/WhyThisRoute";
 import { Scoreboard } from "../components/Scoreboard";
 import { BrandLogo } from "../components/BrandLogo";
 import { VehicleRail } from "../components/VehicleRail";
@@ -30,7 +30,7 @@ import { WinSheetPanel } from "../components/WinSheetPanel";
 import { fmtClock } from "../lib/format";
 import { loadSyntheticScenario, runLabOptimize } from "../lib/labApi";
 import { persistLabCompareSession, writeLabSession } from "../lib/labSession";
-import type { Metrics, ScenarioDetail, Solution, SolveMode, Stop, Weather } from "../types";
+import type { Metrics, RoutePlan, ScenarioDetail, Solution, SolveMode, Stop, Weather } from "../types";
 
 interface ConsoleProps {
   onBack: () => void;
@@ -539,23 +539,30 @@ export function Console({ onBack }: ConsoleProps) {
 
   const selected = useMemo(() => {
     if (!selectedId || !scenario) {
-      return { stop: null as Stop | null, order: null, vehicleId: null as string | null };
+      return {
+        stop: null as Stop | null,
+        order: null,
+        vehicleId: null as string | null,
+        route: null as RoutePlan | null,
+      };
     }
     const order = scenario.orders.find((o) => o.order_id === selectedId) ?? null;
     const unassigned = solution?.unassigned.find((u) => u.order_id === selectedId) ?? null;
     let stop: Stop | null = null;
     let vehicleId: string | null = null;
+    let route: RoutePlan | null = null;
     if (solution) {
       for (const r of solution.routes) {
         const found = r.stops.find((s) => s.order_id === selectedId);
         if (found) {
           stop = found;
           vehicleId = r.vehicle_id;
+          route = r;
           break;
         }
       }
     }
-    return { stop, order: order ?? unassigned, vehicleId };
+    return { stop, order: order ?? unassigned, vehicleId, route };
   }, [selectedId, scenario, solution]);
 
   const idleRoutes = useMemo(() => {
@@ -1036,10 +1043,12 @@ export function Console({ onBack }: ConsoleProps) {
               </p>
             )}
             {selectedId && (
-              <RiskInspector
+              <WhyThisRoute
                 stop={selected.stop}
                 order={selected.order}
                 vehicleId={selected.vehicleId}
+                route={selected.route}
+                constraintLog={solution?.constraint_log ?? []}
                 held={held.includes(selectedId)}
                 onClose={() => setSelectedId(null)}
                 onHold={(h) => void onHold(h)}
