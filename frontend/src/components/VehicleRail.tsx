@@ -1,35 +1,65 @@
 import type { RoutePlan } from "../types";
-import { vehicleColor } from "../lib/vehicleStyle";
+import { patternCss, vehicleColor, vehicleVisual } from "../lib/vehicleStyle";
 import { fmtClock } from "../lib/format";
 
 interface VehicleRailProps {
   routes: RoutePlan[];
   hoverVehicle: string | null;
+  focusVehicle: string | null;
+  unavailableVehicleIds?: string[];
   onHover: (id: string | null) => void;
+  onFocus: (id: string | null) => void;
   onSelectStop: (orderId: string) => void;
   selectedId: string | null;
 }
 
-export function VehicleRail({ routes, hoverVehicle, onHover, onSelectStop, selectedId }: VehicleRailProps) {
+export function VehicleRail({
+  routes,
+  hoverVehicle,
+  focusVehicle,
+  unavailableVehicleIds = [],
+  onHover,
+  onFocus,
+  onSelectStop,
+  selectedId,
+}: VehicleRailProps) {
+  const unavailable = new Set(unavailableVehicleIds);
   return (
     <div className="flex flex-col gap-3">
       {routes.map((route) => {
         const pct = Math.min(100, Math.round((route.load / Math.max(route.capacity, 1)) * 100));
+        const vis = vehicleVisual(route.vehicle_id);
         const color = vehicleColor(route.vehicle_id);
-        const active = hoverVehicle === route.vehicle_id;
+        const down = unavailable.has(route.vehicle_id);
+        const focused = focusVehicle === route.vehicle_id;
+        const hovered = hoverVehicle === route.vehicle_id;
+        const dim = Boolean(focusVehicle && !focused);
         return (
           <article
             key={route.vehicle_id}
-            className={`border bg-snow p-4 ${active ? "border-ink" : "border-hairline"}`}
+            className={`border bg-snow p-4 transition ${
+              focused ? "border-ink ring-1 ring-ink" : hovered ? "border-ink" : "border-hairline"
+            } ${dim || down ? "opacity-45" : ""}`}
             onMouseEnter={() => onHover(route.vehicle_id)}
             onMouseLeave={() => onHover(null)}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-mute">
-                  <span className="inline-block h-2.5 w-2.5" style={{ background: color }} aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => onFocus(focused ? null : route.vehicle_id)}
+                  className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-mute hover:text-ink"
+                  title={focused ? "Clear vehicle focus" : "Focus this van on the map"}
+                >
+                  <span
+                    className="inline-block h-0 w-8 border-t-2"
+                    style={{ borderColor: down ? "#9A9A9A" : color, borderStyle: patternCss(vis.patternLabel) }}
+                    aria-hidden
+                  />
                   Van · {route.vehicle_id}
-                </p>
+                  {down ? <span className="text-coral"> · UNAVAILABLE</span> : null}
+                  {focused ? <span className="text-ink"> · FOCUSED</span> : null}
+                </button>
                 <h3 className="mt-1 font-sans text-[20px] font-semibold text-ink">{route.driver || route.vehicle_id}</h3>
                 <p className="font-mono text-[11px] text-mute">
                   {route.plate}

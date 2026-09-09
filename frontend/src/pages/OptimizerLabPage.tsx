@@ -24,7 +24,7 @@ export function OptimizerLabPage() {
           <Link to="/presentation" className="font-sans text-[13px] font-semibold text-mute hover:text-ink">
             Presentation
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-mute">V1 Optimizer Lab</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-mute">Optimizer Lab</span>
         </div>
       </div>
       <Console onBack={() => navigate(returnTo)} />

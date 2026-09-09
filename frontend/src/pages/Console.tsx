@@ -51,6 +51,7 @@ export function Console({ onBack }: ConsoleProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverVehicle, setHoverVehicle] = useState<string | null>(null);
+  const [focusVehicle, setFocusVehicle] = useState<string | null>(null);
   const [held, setHeld] = useState<string[]>([]);
   const [weather, setWeather] = useState<Weather | null>(null);
   const [briefing, setBriefing] = useState<string[]>([]);
@@ -129,6 +130,7 @@ export function Console({ onBack }: ConsoleProps) {
     let cancelled = false;
     setSolution(null);
     setSelectedId(null);
+    setFocusVehicle(null);
     setError(null);
     setBriefing([]);
     setPlayMin(null);
@@ -139,7 +141,7 @@ export function Console({ onBack }: ConsoleProps) {
     Promise.all([reloadScenario(scenarioId), reloadHistory(scenarioId)]).catch((e: Error) => {
       if (!cancelled) {
         if (scenarioId === "lab") {
-          setError("No synthetic day yet — click Synthetic day to generate one.");
+          setError("No synthetic scenario yet — click Load Scenario to generate one.");
           setScenario(null);
           setScenarioLoading(false);
         } else {
@@ -158,6 +160,7 @@ export function Console({ onBack }: ConsoleProps) {
     setError(null);
     setSolution(null);
     setSelectedId(null);
+    setFocusVehicle(null);
     setHeld([]);
     setComparisonRows([]);
     setTravelPair(null);
@@ -170,12 +173,12 @@ export function Console({ onBack }: ConsoleProps) {
       await reloadScenario("lab");
       await reloadHistory("lab");
       setBriefing([
-        "Fresh synthetic Bengaluru day loaded (new every click).",
+        "SYNTHETIC DEMO SCENARIO — fresh Bengaluru day (new every Load).",
         `${payload.summary.orders} orders · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical · demand ${payload.summary.total_demand}.`,
-        "Run Compare both or Smart optimize — same engines as Day A/B.",
+        "Run Optimize to compare Baseline vs Nexus on this scenario.",
       ]);
       setToast(
-        `Synthetic day ready · ${payload.summary.orders} stops · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical`,
+        `Scenario loaded · ${payload.summary.orders} orders · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical`,
       );
       setShowHelp(false);
     } catch (e) {
@@ -265,12 +268,22 @@ export function Console({ onBack }: ConsoleProps) {
       setDisclosure(result.data_disclosure ?? "");
       if (result.optimize.weather) setWeather(result.optimize.weather);
       setBriefing([
-        isLab ? "Compared naive vs smart on this synthetic day." : "Compared naive vs smart on the same day.",
+        isLab ? "Compared Baseline vs Nexus on this synthetic day." : "Compared Baseline vs Nexus on the same day.",
         ...(result.improvements?.slice(0, 3) ?? []),
         `Late Δ ${result.deltas.late_count} · Distance Δ ${result.deltas.distance_km} km.`,
+        result.optimize.feasible
+          ? "Nexus plan is feasible under hard capacity + time windows."
+          : "Nexus plan is NOT fully feasible — some stops deferred to protect hard constraints.",
+        result.optimize.partial
+          ? `Partial: ${result.optimize.unassigned.length} stops deferred (honest infeasibility under constraints).`
+          : "All stops assigned without breaking hard constraints.",
       ]);
       await reloadHistory(scenarioId);
-      setToast("Comparison complete. See the improvement table.");
+      setToast(
+        result.optimize.feasible && !result.optimize.partial
+          ? "Optimization complete — feasible Nexus plan."
+          : "Optimization complete — partial / constrained result (shown honestly).",
+      );
       setShowHelp(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Compare failed");
@@ -366,6 +379,12 @@ export function Console({ onBack }: ConsoleProps) {
   const mode = solution?.mode ?? "optimize";
   const orderCount = scenario?.orders.length ?? 0;
   const vanCount = scenario?.vehicles.length ?? 0;
+  const criticalCount = scenario?.orders.filter((o) => o.priority === "critical").length ?? 0;
+  const highRiskCount =
+    solution?.routes.reduce(
+      (n, r) => n + r.stops.filter((s) => (s.risk?.p_late ?? 0) >= 0.55).length,
+      0,
+    ) ?? 0;
 
   const btn =
     "inline-flex min-h-11 items-center gap-2 border border-hairline bg-snow px-3 py-2 font-sans text-[13px] font-semibold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
@@ -399,19 +418,43 @@ export function Console({ onBack }: ConsoleProps) {
             <div>
               <p className="font-sans text-[15px] font-semibold">Nexus Optimizer Lab</p>
               <p className="mt-0.5 max-w-[54ch] font-sans text-[13px] leading-snug text-mute">
-                Plan van stops for Bengaluru. Compare a naive schedule against a smart one. Rules (capacity + time
-                windows) are never broken.
+                Load a fresh synthetic scenario, run real OR-Tools CVRPTW, compare Baseline vs Nexus. Hard capacity and
+                time windows are never broken.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowHelp((v) => !v)}
-            className="inline-flex min-h-10 items-center gap-2 border border-hairline px-3 py-2 font-sans text-[13px] font-semibold text-ink hover:border-ink"
-          >
-            <HelpCircle size={16} />
-            {showHelp ? "Hide help" : "Show help"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void loadNewSynthetic()}
+              className="inline-flex min-h-11 items-center gap-2 border border-ink bg-snow px-4 py-2 font-sans text-[13px] font-semibold text-ink hover:bg-paper disabled:opacity-40"
+              title="POST /api/lab/synthetic — new scenario every click"
+            >
+              <Sparkles size={15} />
+              {solving === "synthetic" ? "Generating…" : "Load Scenario"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || scenarioLoading || !scenario}
+              onClick={() => void runCompare()}
+              className={`inline-flex min-h-11 items-center gap-2 bg-coral px-5 py-2 font-sans text-[13px] font-semibold text-ink hover:brightness-95 disabled:opacity-40 ${
+                solving === "compare" ? "solving-glow" : ""
+              }`}
+              title="POST /api/compare — real Baseline vs Nexus"
+            >
+              {solving === "compare" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Optimize
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHelp((v) => !v)}
+              className="inline-flex min-h-10 items-center gap-2 border border-hairline px-3 py-2 font-sans text-[13px] font-semibold text-ink hover:border-ink"
+            >
+              <HelpCircle size={16} />
+              {showHelp ? "Hide help" : "Show help"}
+            </button>
+          </div>
         </div>
 
         {showHelp && (
@@ -427,26 +470,52 @@ export function Console({ onBack }: ConsoleProps) {
             <h2 className="pr-8 font-sans text-[18px] font-semibold">How to use this screen</h2>
             <ol className="mt-3 grid gap-3 font-sans text-[14px] text-mute sm:grid-cols-3">
               <li>
-                <span className="font-semibold text-ink">Pick a day</span>
+                <span className="font-semibold text-ink">1. Load Scenario</span>
                 <br />
-                Day A = normal. Day B = too many stops. Synthetic day = fresh random Bengaluru data every click.
+                Fresh SYNTHETIC DEMO SCENARIO every click (or use Day A / Day B packs).
               </li>
               <li>
-                <span className="font-semibold text-ink">Run Naive plan</span>
+                <span className="font-semibold text-ink">2. Optimize</span>
                 <br />
-                Shows a weak schedule. Expect late deliveries.
+                Runs real Baseline + Nexus (OR-Tools). Metrics are never fabricated.
               </li>
               <li>
-                <span className="font-semibold text-ink">Run Smart optimize</span>
+                <span className="font-semibold text-ink">3. Map & risk</span>
                 <br />
-                Improves routes. Scoreboard shows the difference.
+                Click a van to focus its route. Critical = ◆ · High risk = ! from actual ML scores.
               </li>
             </ol>
             <p className="mt-3 font-sans text-[13px] text-mute">
-              Tip: click any stop on the map to see late-risk advice. Risk never changes the route by itself.
+              Tip: if the plan is partial, deferred stops stay deferred — we do not fake feasibility.
             </p>
           </section>
         )}
+
+        {/* Scenario intelligence strip */}
+        <div className="grid gap-3 border border-hairline bg-snow px-4 py-3 sm:grid-cols-[1fr_auto]">
+          <div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">
+              {isLab ? "Synthetic demo scenario" : scenarioId === "b" ? "Day B · Overconstrained pack" : "Day A · Feasible pack"}
+            </p>
+            <p className="mt-1 font-sans text-[20px] font-semibold tabular text-ink">
+              {scenarioLoading
+                ? "Loading…"
+                : `${orderCount} orders · ${vanCount} vehicles · ${criticalCount} critical`}
+            </p>
+            <p className="mt-0.5 font-mono text-[11px] text-mute">
+              id <span className="text-ink">{scenarioId}</span>
+              {labGenerationId ? ` · ${labGenerationId}` : ""}
+              {solution
+                ? ` · ${solution.feasible && !solution.partial ? "feasible" : "partial / constrained"} · high-risk stops ${highRiskCount}`
+                : " · not optimized yet"}
+            </p>
+          </div>
+          {isLab && (
+            <p className="self-center border border-ink px-3 py-2 font-mono text-[10px] font-semibold uppercase tracking-wide text-ink">
+              Synthetic demo scenario
+            </p>
+          )}
+        </div>
 
         <header className="border border-hairline bg-snow">
           <div className="flex flex-wrap items-center gap-3 border-b border-hairline px-4 py-3">
@@ -483,12 +552,12 @@ export function Console({ onBack }: ConsoleProps) {
                   }`}
                 >
                   <Sparkles size={15} />
-                  {solving === "synthetic" ? "Generating…" : isLab ? "New synthetic day" : "Synthetic day"}
+                  {solving === "synthetic" ? "Generating…" : isLab ? "Reload scenario" : "Load Scenario"}
                 </button>
               </div>
               {isLab && labGenerationId && (
                 <p className="mt-1.5 font-mono text-[11px] text-mute">
-                  {labGenerationId} · click again for a different day
+                  {labGenerationId} · each Load creates a new SYNTHETIC DEMO SCENARIO
                 </p>
               )}
             </div>
@@ -571,7 +640,7 @@ export function Console({ onBack }: ConsoleProps) {
                 title="Run naive + smart together and show the difference"
               >
                 {solving === "compare" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Compare both
+                Baseline vs Nexus
               </button>
               <button
                 type="button"
@@ -583,7 +652,7 @@ export function Console({ onBack }: ConsoleProps) {
                 }`}
               >
                 {solving === "optimize" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Smart optimize
+                Nexus only
               </button>
             </div>
           </div>
@@ -613,6 +682,29 @@ export function Console({ onBack }: ConsoleProps) {
           showDeltas={showDeltas}
           loading={busy}
         />
+
+        {solution && (
+          <div
+            className={`border px-4 py-3 font-sans text-[14px] ${
+              solution.feasible && !solution.partial
+                ? "border-hairline bg-snow text-ink"
+                : "border-coral bg-snow text-ink"
+            }`}
+            role="status"
+          >
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-wide text-mute">Plan status</p>
+            <p className="mt-1 font-semibold">
+              {solution.feasible && !solution.partial
+                ? "Feasible Nexus plan — hard capacity and time windows satisfied."
+                : solution.partial
+                  ? `Partial plan — ${solution.unassigned.length} stops deferred. Not marked as fully optimized.`
+                  : "Infeasible under hard constraints — shown honestly (no fabricated success)."}
+            </p>
+            <p className="mt-1 text-[13px] text-mute">
+              mode {solution.mode} · travel {solution.travel_source} · ML high-risk stops (p≥0.55): {highRiskCount}
+            </p>
+          </div>
+        )}
 
         {solution && (
           <p className="font-mono text-[12px] text-mute">
@@ -682,9 +774,11 @@ export function Console({ onBack }: ConsoleProps) {
               scenario={scenario}
               solution={solution}
               selectedId={selectedId}
+              focusVehicle={focusVehicle}
               hoverVehicle={hoverVehicle}
               playMin={playMin}
               onSelect={setSelectedId}
+              onFocusVehicle={setFocusVehicle}
             />
             {selectedId && (
               <RiskInspector
@@ -698,11 +792,15 @@ export function Console({ onBack }: ConsoleProps) {
             )}
           </div>
           <div className="flex max-h-[min(760px,70vh)] flex-col gap-3 overflow-y-auto pr-1">
-            <p className="font-sans text-[12px] font-semibold uppercase tracking-wide text-mute">Vans & drivers</p>
+            <p className="font-sans text-[12px] font-semibold uppercase tracking-wide text-mute">
+              Vans & drivers{focusVehicle ? ` · focused ${focusVehicle}` : ""}
+            </p>
             <VehicleRail
               routes={idleRoutes}
               hoverVehicle={hoverVehicle}
+              focusVehicle={focusVehicle}
               onHover={setHoverVehicle}
+              onFocus={setFocusVehicle}
               onSelectStop={setSelectedId}
               selectedId={selectedId}
             />
@@ -726,7 +824,7 @@ export function Console({ onBack }: ConsoleProps) {
         )}
 
         <footer className="border-t border-hairline pt-3 font-sans text-[12px] text-mute">
-          Shortcuts: 1/2 switch day · B naive plan · O smart optimize · Esc closes panels
+          Shortcuts: 1/2 Day A/B · 3 Load Scenario · B naive · O Nexus · Esc closes panels · click van to focus route
         </footer>
       </div>
     </div>
