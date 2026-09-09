@@ -28,6 +28,8 @@ frontend/.vite/
 .env
 .env.*
 !.env.example
+frontend/.env.local
+secrets/
 *.pem
 *.p12
 *.key
@@ -37,6 +39,7 @@ frontend/.vite/
 firebase-adminsdk*.json
 google-services.json
 GoogleService-Info.plist
+
 
 # Local SQLite runtime (seeded from CSV scenarios on startup)
 backend/data/nexus.db

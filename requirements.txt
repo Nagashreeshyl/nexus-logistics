@@ -4,9 +4,13 @@ pydantic==2.10.6
 pandas==2.2.3
 numpy==2.2.3
 ortools==9.11.4210
+protobuf==5.26.1
 scikit-learn==1.6.1
 joblib==1.4.2
 starlette==0.41.3
 redis==5.2.1
 pytest==8.3.5
 httpx==0.28.1
+firebase-admin==6.5.0
+google-auth==2.36.0
+requests==2.32.3

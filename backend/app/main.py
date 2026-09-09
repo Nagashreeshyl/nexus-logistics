@@ -28,10 +28,11 @@ from .models import (
 )
 from .nominatim import reverse as nominatim_reverse
 from .optimizer import run_optimize
+from .firebase_app import firebase_configured, init_firebase
 from .risk import DATA_DISCLOSURE, RiskModel
 from .weather import fetch_weather
 
-app = FastAPI(title="JP-019 Nexus Last-Mile", version="1.3.0")
+app = FastAPI(title="JP-019 Nexus Last-Mile", version="2.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -48,6 +49,7 @@ WEATHER: dict[str, Any] = {}
 def _startup() -> None:
     global WEATHER
     db.init_db()
+    init_firebase()  # no-op if credentials missing
     WEATHER = fetch_weather()
 
 
@@ -151,8 +153,14 @@ def _briefing_from_out(payload: dict[str, Any]) -> dict[str, Any]:
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     travel_pref = "haversine (demo/offline)" if force_haversine() else "osrm→haversine_fallback"
+    fb_ok = firebase_configured()
     return {
         "ok": True,
+        "version": "2.1.0",
+        "firebase": {
+            "configured": fb_ok,
+            "initialized": init_firebase() if fb_ok else False,
+        },
         "weather": WEATHER,
         "routing": travel_pref,
         "force_haversine": force_haversine(),
@@ -173,6 +181,7 @@ def health() -> dict[str, Any]:
             "briefing",
             "weather-refresh",
             "solve-history",
+            "firebase-foundation",
         ],
     }
 
