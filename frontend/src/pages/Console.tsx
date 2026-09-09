@@ -17,6 +17,7 @@ import { ConstraintLog } from "../components/ConstraintLog";
 import { DeferredList } from "../components/DeferredList";
 import { ExceptionStory } from "../components/ExceptionStory";
 import { ExportViewer, type ExportKind } from "../components/ExportViewer";
+import { DisruptionPanel } from "../components/DisruptionPanel";
 import { GuideBanner } from "../components/GuideBanner";
 import { HistoryPanel } from "../components/HistoryPanel";
 import { LoadingOverlay } from "../components/LoadingOverlay";
@@ -27,7 +28,7 @@ import { BrandLogo } from "../components/BrandLogo";
 import { VehicleRail } from "../components/VehicleRail";
 import { WinSheetPanel } from "../components/WinSheetPanel";
 import { fmtClock } from "../lib/format";
-import { loadSyntheticScenario } from "../lib/labApi";
+import { loadSyntheticScenario, runLabOptimize } from "../lib/labApi";
 import { persistLabCompareSession, writeLabSession } from "../lib/labSession";
 import type { Metrics, ScenarioDetail, Solution, SolveMode, Stop, Weather } from "../types";
 
@@ -35,7 +36,7 @@ interface ConsoleProps {
   onBack: () => void;
 }
 
-type BusyMode = SolveMode | "compare" | "synthetic" | null;
+type BusyMode = SolveMode | "compare" | "synthetic" | "breakdown" | null;
 /** Day packs a/b plus live synthetic pack persisted as SQLite id `lab`. */
 type DayId = "a" | "b" | "lab";
 
@@ -53,6 +54,9 @@ export function Console({ onBack }: ConsoleProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverVehicle, setHoverVehicle] = useState<string | null>(null);
   const [focusVehicle, setFocusVehicle] = useState<string | null>(null);
+  const [breakdownVehicle, setBreakdownVehicle] = useState<string | null>(null);
+  const [unavailableVehicleIds, setUnavailableVehicleIds] = useState<string[]>([]);
+  const [preDisruption, setPreDisruption] = useState<Solution | null>(null);
   const [held, setHeld] = useState<string[]>([]);
   const [weather, setWeather] = useState<Weather | null>(null);
   const [briefing, setBriefing] = useState<string[]>([]);
@@ -132,6 +136,9 @@ export function Console({ onBack }: ConsoleProps) {
     setSolution(null);
     setSelectedId(null);
     setFocusVehicle(null);
+    setBreakdownVehicle(null);
+    setUnavailableVehicleIds([]);
+    setPreDisruption(null);
     setError(null);
     setBriefing([]);
     setPlayMin(null);
@@ -162,6 +169,9 @@ export function Console({ onBack }: ConsoleProps) {
     setSolution(null);
     setSelectedId(null);
     setFocusVehicle(null);
+    setBreakdownVehicle(null);
+    setUnavailableVehicleIds([]);
+    setPreDisruption(null);
     setHeld([]);
     setComparisonRows([]);
     setTravelPair(null);
@@ -370,6 +380,125 @@ export function Console({ onBack }: ConsoleProps) {
     }
   }, [scenarioId, isLab, reloadHistory, scenario, labGenerationId]);
 
+  const simulateBreakdown = useCallback(async () => {
+    if (!scenario || !solution || !breakdownVehicle) return;
+    setSolving("breakdown");
+    setError(null);
+    setPlaying(false);
+    try {
+      const before = solution;
+      setPreDisruption(before);
+      const affected =
+        before.routes.find((r) => r.vehicle_id === breakdownVehicle)?.stops.length ?? 0;
+      const result = await runLabOptimize({
+        scenario_id: scenarioId,
+        orders: scenario.orders.map((o) => ({
+          order_id: o.order_id,
+          lat: o.lat,
+          lon: o.lon,
+          demand: o.demand,
+          tw_start: o.tw_start,
+          tw_end: o.tw_end,
+          service_min: o.service_min,
+          priority: o.priority,
+          zone: o.zone,
+          customer: o.customer,
+          address: o.address,
+        })),
+        vehicles: scenario.vehicles.map((v) => ({
+          vehicle_id: v.vehicle_id,
+          capacity: v.capacity,
+          depot_lat: v.depot_lat,
+          depot_lon: v.depot_lon,
+          shift_start: v.shift_start,
+          shift_end: v.shift_end,
+          driver: v.driver,
+          plate: v.plate,
+        })),
+        exclude_vehicle_ids: [breakdownVehicle],
+        depot_lat: scenario.depot[0],
+        depot_lon: scenario.depot[1],
+      });
+      setUnavailableVehicleIds(result.excluded_vehicles?.length ? result.excluded_vehicles : [breakdownVehicle]);
+      setSolution(result.optimize);
+      setComparisonRows(
+        (result.comparison ?? []).map((row) => ({
+          ...row,
+          better_when: row.better_when ?? "lower",
+        })),
+      );
+      setTravelPair(result.travel_source ?? null);
+      setDisclosure(result.data_disclosure ?? "");
+      setBaselines((prev) => ({ ...prev, [scenarioId]: result.baseline.metrics }));
+      setFocusVehicle(null);
+      setBriefing([
+        `⚠ Vehicle ${breakdownVehicle} UNAVAILABLE — ${affected} stops on its prior route.`,
+        "Reoptimized with remaining fleet via real OR-Tools (exclude_vehicle_ids).",
+        result.optimize.partial
+          ? `After: partial plan — ${result.optimize.unassigned.length} deferred.`
+          : result.optimize.feasible
+            ? "After: feasible plan under hard constraints."
+            : "After: constrained result shown honestly.",
+        `Late ${before.metrics.late_count} → ${result.optimize.metrics.late_count} · km ${before.metrics.distance_km.toFixed(1)} → ${result.optimize.metrics.distance_km.toFixed(1)}.`,
+      ]);
+      writeLabSession({
+        disruption: {
+          vehicle_id: breakdownVehicle,
+          affected_orders: affected,
+          before_late: before.metrics.late_count,
+          after_late: result.optimize.metrics.late_count,
+          before_distance_km: Number(before.metrics.distance_km.toFixed(1)),
+          after_distance_km: Number(result.optimize.metrics.distance_km.toFixed(1)),
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      const highRisk = result.optimize.routes.reduce(
+        (n, r) => n + r.stops.filter((s) => (s.risk?.p_late ?? 0) >= 0.55).length,
+        0,
+      );
+      persistLabCompareSession({
+        scenarioId,
+        orders: scenario.orders.length,
+        vehicles: scenario.vehicles.length,
+        critical: scenario.orders.filter((o) => o.priority === "critical").length,
+        totalDemand: scenario.orders.reduce((n, o) => n + o.demand, 0),
+        generationId: labGenerationId,
+        baseline: {
+          distance_km: before.metrics.distance_km,
+          late_count: before.metrics.late_count,
+          hard_breaches: before.metrics.hard_breaches,
+          unassigned_count: before.metrics.unassigned_count,
+        },
+        optimize: {
+          distance_km: result.optimize.metrics.distance_km,
+          late_count: result.optimize.metrics.late_count,
+          hard_breaches: result.optimize.metrics.hard_breaches,
+          unassigned_count: result.optimize.metrics.unassigned_count,
+          feasible: result.optimize.feasible,
+          partial: result.optimize.partial,
+          criticals_served: result.optimize.metrics.criticals_served,
+          time_min: result.optimize.metrics.time_min,
+        },
+        highRiskCount: highRisk,
+        travelSource: result.optimize.travel_source,
+      });
+      setToast(`Breakdown simulated — ${breakdownVehicle} excluded; new plan from solver.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Breakdown reoptimization failed");
+      setPreDisruption(null);
+      setUnavailableVehicleIds([]);
+    } finally {
+      setSolving(null);
+    }
+  }, [scenario, solution, breakdownVehicle, scenarioId, labGenerationId]);
+
+  const clearDisruption = useCallback(() => {
+    setUnavailableVehicleIds([]);
+    setBreakdownVehicle(null);
+    setPreDisruption(null);
+    setToast("Disruption markers cleared — current plan unchanged.");
+  }, []);
+
   const onHold = useCallback(
     async (nextHeld: boolean) => {
       if (!selectedId) return;
@@ -430,7 +559,31 @@ export function Console({ onBack }: ConsoleProps) {
   }, [selectedId, scenario, solution]);
 
   const idleRoutes = useMemo(() => {
-    if (solution) return solution.routes;
+    if (solution) {
+      const routes = [...solution.routes];
+      // Keep broken vans visible in the rail with empty stops.
+      for (const vid of unavailableVehicleIds) {
+        if (routes.some((r) => r.vehicle_id === vid)) continue;
+        const v = scenario?.vehicles.find((x) => x.vehicle_id === vid);
+        const prior = preDisruption?.routes.find((r) => r.vehicle_id === vid);
+        routes.push({
+          vehicle_id: vid,
+          load: 0,
+          capacity: v?.capacity ?? prior?.capacity ?? 0,
+          polyline: [],
+          stops: [],
+          shift_start: v?.shift_start ?? prior?.shift_start ?? 0,
+          shift_end: v?.shift_end ?? prior?.shift_end ?? 0,
+          capacity_breach: false,
+          driver: v?.driver ?? prior?.driver ?? "",
+          plate: v?.plate ?? prior?.plate ?? "",
+          phone: v?.phone ?? prior?.phone ?? "",
+          rating: v?.rating ?? prior?.rating ?? 0,
+          road_source: "unavailable",
+        });
+      }
+      return routes;
+    }
     if (!scenario) return [];
     return scenario.vehicles.map((v) => ({
       vehicle_id: v.vehicle_id,
@@ -447,7 +600,7 @@ export function Console({ onBack }: ConsoleProps) {
       rating: v.rating,
       road_source: "pending",
     }));
-  }, [solution, scenario]);
+  }, [solution, scenario, unavailableVehicleIds, preDisruption]);
 
   const baseline = baselines[scenarioId] ?? null;
   const showDeltas = Boolean(solution && solution.mode === "optimize" && baseline);
@@ -808,6 +961,24 @@ export function Console({ onBack }: ConsoleProps) {
           />
         )}
 
+        {solution && scenario && (
+          <DisruptionPanel
+            vehicleIds={scenario.vehicles.map((v) => v.vehicle_id)}
+            selectedVehicle={breakdownVehicle}
+            unavailableVehicleIds={unavailableVehicleIds}
+            busy={busy}
+            hasPlan={Boolean(solution)}
+            beforeMetrics={preDisruption?.metrics ?? null}
+            afterMetrics={unavailableVehicleIds.length ? solution.metrics : null}
+            onSelectVehicle={(id) => {
+              setBreakdownVehicle(id);
+              if (id) setFocusVehicle(id);
+            }}
+            onSimulate={() => void simulateBreakdown()}
+            onClear={clearDisruption}
+          />
+        )}
+
         {disclosure && (
           <p className="font-sans text-[12px] text-mute">
             Data note: <span className="text-ink">{disclosure}</span>
@@ -855,9 +1026,15 @@ export function Console({ onBack }: ConsoleProps) {
               focusVehicle={focusVehicle}
               hoverVehicle={hoverVehicle}
               playMin={playMin}
+              unavailableVehicleIds={unavailableVehicleIds}
               onSelect={setSelectedId}
               onFocusVehicle={setFocusVehicle}
             />
+            {unavailableVehicleIds[0] && (
+              <p className="pointer-events-none absolute left-3 top-3 z-[600] border border-coral bg-[#FFF5F2] px-3 py-1.5 font-sans text-[12px] font-semibold text-ink">
+                ⚠ Vehicle {unavailableVehicleIds[0]} UNAVAILABLE
+              </p>
+            )}
             {selectedId && (
               <RiskInspector
                 stop={selected.stop}
@@ -877,6 +1054,7 @@ export function Console({ onBack }: ConsoleProps) {
               routes={idleRoutes}
               hoverVehicle={hoverVehicle}
               focusVehicle={focusVehicle}
+              unavailableVehicleIds={unavailableVehicleIds}
               onHover={setHoverVehicle}
               onFocus={setFocusVehicle}
               onSelectStop={setSelectedId}
