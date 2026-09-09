@@ -521,16 +521,33 @@ export function PresentationPage() {
               <Stat label="Vehicles" value={session.summary.vehicles} />
               <Stat label="Critical" value={session.summary.critical} />
               <Stat label="Demand" value={session.summary.total_demand} />
+              {session.metrics && (
+                <>
+                  <Stat label="Nexus late" value={session.metrics.nexus.late_count} />
+                  <Stat label="Nexus km" value={session.metrics.nexus.distance_km} />
+                </>
+              )}
             </div>
           ) : (
             <p className="mt-6 font-sans text-[14px] text-mute">
-              No Lab scenario in this browser session yet — generate one with <strong>Synthetic day</strong> in the Lab.
+              Run the Optimizer Lab to populate live results.
+            </p>
+          )}
+          {session.scenario_id && (
+            <p className="mt-3 font-mono text-[11px] text-mute">
+              Session scenario <span className="text-ink">{session.scenario_id}</span>
+              {session.summary?.generation_id ? ` · ${session.summary.generation_id}` : ""}
+              {session.metrics?.updatedAt
+                ? ` · captured ${new Date(session.metrics.updatedAt).toLocaleTimeString()}`
+                : ""}
             </p>
           )}
           <button type="button" onClick={openLab} className="mt-10 bg-coral px-10 py-5 font-sans text-[18px] font-semibold">
-            Open Optimizer Lab →
+            RUN LIVE OPTIMIZATION →
           </button>
-          <p className="mt-4 font-mono text-[11px] text-mute">Returns here at slide 07 after you click ← Back to Presentation</p>
+          <p className="mt-4 font-mono text-[11px] text-mute">
+            Returns to slide {String(slide).padStart(2, "0")} after Back to Presentation
+          </p>
         </SlideFrame>
       )}
 
@@ -567,7 +584,7 @@ export function PresentationPage() {
           )}
           {!session.disruption && (
             <p className="mt-4 font-sans text-[14px] text-mute">
-              Conceptual story — run Optimize in the Lab, then return (holds/re-solve demonstrate replanning).
+              Run a vehicle breakdown in the Optimizer Lab to populate this demonstration.
             </p>
           )}
           <div className="mt-8 flex flex-wrap gap-3">
@@ -597,7 +614,9 @@ export function PresentationPage() {
           </ul>
           {session.metrics ? (
             <div className="mt-8 max-w-lg border border-hairline bg-snow p-5">
-              <p className="font-mono text-[11px] uppercase tracking-wide text-mute">Latest demo result (this session)</p>
+              <p className="font-mono text-[11px] uppercase tracking-wide text-mute">
+                Measured on the current synthetic demonstration scenario
+              </p>
               <div className="mt-3 grid grid-cols-2 gap-3 font-sans text-[14px]">
                 <p>
                   Distance <span className="font-semibold">{session.metrics.nexus.distance_km} km</span>
@@ -614,11 +633,16 @@ export function PresentationPage() {
               </div>
               <p className="mt-2 font-mono text-[10px] text-mute">
                 Baseline late {session.metrics.before.late_count} → Nexus {session.metrics.nexus.late_count}
-                {session.metrics.nexus.partial ? " · partial" : ""}
+                {session.metrics.nexus.partial ? " · partial" : session.metrics.nexus.feasible ? " · feasible" : ""}
+                {session.metrics.high_risk_count != null
+                  ? ` · high-risk stops ${session.metrics.high_risk_count}`
+                  : ""}
               </p>
             </div>
           ) : (
-            <p className="mt-6 font-sans text-[14px] text-mute">Run Compare / Smart in the Optimizer Lab to capture measured results here.</p>
+            <p className="mt-6 font-sans text-[14px] text-mute">
+              Run the Optimizer Lab to populate live results.
+            </p>
           )}
           <div className="mt-12">
             <h1 className="font-sans text-[clamp(2rem,6vw,3.4rem)] font-semibold">NEXUS LOGISTICS</h1>

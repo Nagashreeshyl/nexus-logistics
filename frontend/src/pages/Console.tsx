@@ -28,6 +28,7 @@ import { VehicleRail } from "../components/VehicleRail";
 import { WinSheetPanel } from "../components/WinSheetPanel";
 import { fmtClock } from "../lib/format";
 import { loadSyntheticScenario } from "../lib/labApi";
+import { persistLabCompareSession, writeLabSession } from "../lib/labSession";
 import type { Metrics, ScenarioDetail, Solution, SolveMode, Stop, Weather } from "../types";
 
 interface ConsoleProps {
@@ -177,6 +178,16 @@ export function Console({ onBack }: ConsoleProps) {
         `${payload.summary.orders} orders · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical · demand ${payload.summary.total_demand}.`,
         "Run Optimize to compare Baseline vs Nexus on this scenario.",
       ]);
+      writeLabSession({
+        scenario_id: "lab",
+        summary: {
+          orders: payload.summary.orders,
+          vehicles: payload.summary.vehicles,
+          critical: payload.summary.critical,
+          total_demand: payload.summary.total_demand,
+          generation_id: payload.generation_id ?? `lab-${payload.seed.toString(16)}`,
+        },
+      });
       setToast(
         `Scenario loaded · ${payload.summary.orders} orders · ${payload.summary.vehicles} vans · ${payload.summary.critical} critical`,
       );
@@ -211,8 +222,45 @@ export function Console({ onBack }: ConsoleProps) {
           result.partial
             ? `${result.unassigned.length} stops could not fit without breaking rules. They are deferred.`
             : "Every stop was assigned without breaking capacity or time windows.",
+          result.feasible && !result.partial
+            ? "Feasible under hard constraints."
+            : "Partial / constrained — not marked as fully optimized.",
         ]);
-        setToast(mode === "optimize" ? "Smart plan ready. Check the map and scoreboard." : "Naive plan ready.");
+        // Persist real metrics for Presentation when we have a baseline+optimize pair or optimize alone.
+        if (mode === "optimize") {
+          const base = baselines[scenarioId] ?? result.metrics;
+          const highRisk = result.routes.reduce(
+            (n, r) => n + r.stops.filter((s) => (s.risk?.p_late ?? 0) >= 0.55).length,
+            0,
+          );
+          persistLabCompareSession({
+            scenarioId,
+            orders: scenario?.orders.length ?? 0,
+            vehicles: scenario?.vehicles.length ?? 0,
+            critical: scenario?.orders.filter((o) => o.priority === "critical").length ?? 0,
+            totalDemand: scenario?.orders.reduce((n, o) => n + o.demand, 0) ?? 0,
+            generationId: labGenerationId,
+            baseline: {
+              distance_km: base.distance_km,
+              late_count: base.late_count,
+              hard_breaches: base.hard_breaches,
+              unassigned_count: base.unassigned_count,
+            },
+            optimize: {
+              distance_km: result.metrics.distance_km,
+              late_count: result.metrics.late_count,
+              hard_breaches: result.metrics.hard_breaches,
+              unassigned_count: result.metrics.unassigned_count,
+              feasible: result.feasible,
+              partial: result.partial,
+              criticals_served: result.metrics.criticals_served,
+              time_min: result.metrics.time_min,
+            },
+            highRiskCount: highRisk,
+            travelSource: result.travel_source,
+          });
+        }
+        setToast(mode === "optimize" ? "Nexus plan ready. Check the map and scoreboard." : "Baseline plan ready.");
         setShowHelp(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Solve failed");
@@ -220,7 +268,7 @@ export function Console({ onBack }: ConsoleProps) {
         setSolving(null);
       }
     },
-    [scenarioId, reloadHistory],
+    [scenarioId, reloadHistory, baselines, scenario, labGenerationId],
   );
 
   useEffect(() => {
@@ -279,6 +327,36 @@ export function Console({ onBack }: ConsoleProps) {
           : "All stops assigned without breaking hard constraints.",
       ]);
       await reloadHistory(scenarioId);
+      const highRisk = result.optimize.routes.reduce(
+        (n, r) => n + r.stops.filter((s) => (s.risk?.p_late ?? 0) >= 0.55).length,
+        0,
+      );
+      persistLabCompareSession({
+        scenarioId,
+        orders: scenario?.orders.length ?? result.optimize.routes.reduce((n, r) => n + r.stops.length, 0),
+        vehicles: scenario?.vehicles.length ?? result.optimize.routes.length,
+        critical: scenario?.orders.filter((o) => o.priority === "critical").length ?? 0,
+        totalDemand: scenario?.orders.reduce((n, o) => n + o.demand, 0) ?? 0,
+        generationId: labGenerationId,
+        baseline: {
+          distance_km: result.baseline.metrics.distance_km,
+          late_count: result.baseline.metrics.late_count,
+          hard_breaches: result.baseline.metrics.hard_breaches,
+          unassigned_count: result.baseline.metrics.unassigned_count,
+        },
+        optimize: {
+          distance_km: result.optimize.metrics.distance_km,
+          late_count: result.optimize.metrics.late_count,
+          hard_breaches: result.optimize.metrics.hard_breaches,
+          unassigned_count: result.optimize.metrics.unassigned_count,
+          feasible: result.optimize.feasible,
+          partial: result.optimize.partial,
+          criticals_served: result.optimize.metrics.criticals_served,
+          time_min: result.optimize.metrics.time_min,
+        },
+        highRiskCount: highRisk,
+        travelSource: result.optimize.travel_source,
+      });
       setToast(
         result.optimize.feasible && !result.optimize.partial
           ? "Optimization complete — feasible Nexus plan."
@@ -290,7 +368,7 @@ export function Console({ onBack }: ConsoleProps) {
     } finally {
       setSolving(null);
     }
-  }, [scenarioId, isLab, reloadHistory]);
+  }, [scenarioId, isLab, reloadHistory, scenario, labGenerationId]);
 
   const onHold = useCallback(
     async (nextHeld: boolean) => {

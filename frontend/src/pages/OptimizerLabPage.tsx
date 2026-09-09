@@ -1,14 +1,23 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { writeLabSession } from "../lib/labSession";
 import { Console } from "./Console";
 
 /**
- * V1 Optimizer Lab (Console) — light Agency workbench.
- * Preserves presentation return-slide deep links.
+ * Optimizer Lab — preserves presentation return-slide deep links.
  */
 export function OptimizerLabPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const returnTo = params.get("returnTo") || "/presentation?slide=7";
+  const fromSlide = Number(params.get("fromSlide") || "") || undefined;
+
+  useEffect(() => {
+    writeLabSession({
+      returnTo,
+      slide: fromSlide && fromSlide >= 1 && fromSlide <= 9 ? fromSlide : undefined,
+    });
+  }, [returnTo, fromSlide]);
 
   return (
     <div className="min-h-dvh bg-paper text-ink">
