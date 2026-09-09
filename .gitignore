@@ -1,0 +1,50 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment & secrets — NEVER commit real credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+*serviceAccount*.json
+*service-account*.json
+*credentials*.json
+firebase-adminsdk*.json
+google-services.json
+GoogleService-Info.plist
+
+# Local SQLite runtime (seeded from CSV scenarios on startup)
+backend/data/nexus.db
+backend/data/nexus.db-*
+
+# Local caches (OSRM matrices, etc.)
+backend/data/cache/
+*.log
+
+# Optional local Redis dump
+dump.rdb

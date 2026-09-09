@@ -1,0 +1,69 @@
+{
+  "artifact_version": 2,
+  "model_name": "GradientBoostingClassifier",
+  "pre_route_model_name": "GradientBoostingClassifier",
+  "features": [
+    "depot_km",
+    "window_width",
+    "load_pct",
+    "seq_index",
+    "demand",
+    "zone_late_rate"
+  ],
+  "pre_route_features": [
+    "depot_km",
+    "window_width",
+    "demand",
+    "zone_late_rate"
+  ],
+  "excluded_features": [
+    "eta_slack"
+  ],
+  "exclusion_note": "eta_slack depends on a planned ETA after routing; excluded from all models. Post-route overlay may use load_pct/seq_index from the planned route. Pre-route triage uses a separate model with PRE_ROUTE_FEATURES only \u2014 no placeholders.",
+  "data_disclosure": "Historical delivery records used for model development are synthetic demonstration data, not real operational telemetry.",
+  "train_size": 315,
+  "test_size": 105,
+  "random_state": 19,
+  "metrics": {
+    "accuracy": 0.7143,
+    "precision": 0.7595,
+    "recall": 0.8451,
+    "f1": 0.8,
+    "roc_auc": 0.768,
+    "confusion_matrix": [
+      [
+        15,
+        19
+      ],
+      [
+        11,
+        60
+      ]
+    ]
+  },
+  "pre_route_metrics": {
+    "accuracy": 0.7524,
+    "precision": 0.8,
+    "recall": 0.8451,
+    "f1": 0.8219,
+    "roc_auc": 0.7713,
+    "confusion_matrix": [
+      [
+        19,
+        15
+      ],
+      [
+        11,
+        60
+      ]
+    ]
+  },
+  "zone_rates": {
+    "HSR": 0.6923,
+    "IND": 0.64,
+    "JPN": 0.6721,
+    "KOR": 0.7119,
+    "WHT": 0.6364
+  },
+  "not_production_validated": true
+}

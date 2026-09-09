@@ -1,0 +1,4 @@
+vehicle_id,capacity,depot_lat,depot_lon,shift_start,shift_end,driver,plate,phone,rating,depot_address
+VAN-1,40,12.9716,77.5946,0,420,Ananya Rao,KA-01-AB-2918,+91 98450 11201,4.8,"Nexus Hub, Richmond Road, Bengaluru 560025"
+VAN-2,40,12.9716,77.5946,0,420,Imran Sheikh,KA-03-CD-4412,+91 98860 22018,4.6,"Nexus Hub, Richmond Road, Bengaluru 560025"
+VAN-3,35,12.9716,77.5946,0,420,Priya Nair,KA-05-EF-1180,+91 99001 33440,4.9,"Nexus Hub, Richmond Road, Bengaluru 560025"

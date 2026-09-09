@@ -1,0 +1,13 @@
+:root {
+  --color-ice: #92cff2;
+  --color-espresso: #241208;
+  --color-coral: #f47c59;
+  --color-snow: #ffffff;
+  --color-zinc: #a1a1aa;
+  --color-border: #27272a;
+  --radius-card: 8px;
+  --radius-pill: 9999px;
+  --space-base: 8px;
+  --space-gap: 16px;
+  --space-card: 24px;
+}

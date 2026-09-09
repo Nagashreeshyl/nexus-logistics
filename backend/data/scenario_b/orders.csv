@@ -1,0 +1,25 @@
+order_id,lat,lon,demand,tw_start,tw_end,service_min,priority,zone,zone_name,customer,address,pincode,phone,sku,cod_inr
+ORD-001,12.986354,77.642671,5,63,100,9,critical,IND,Indiranagar,Meera Iyer,"17, 100 Feet Road, Indiranagar",560038,+91 9813243001,Grocery mix (8 kg),0
+ORD-002,12.98059,77.64849,4,50,87,13,critical,IND,Indiranagar,Rahul Menon,"24, CMH Road, Indiranagar",560038,+91 9826243002,Pharmacy cold-chain,0
+ORD-003,12.981205,77.637643,9,121,166,10,normal,IND,Indiranagar,Sana Qureshi,"31, 12th Main, Indiranagar",560038,+91 9839243003,Electronics — 1 unit,654
+ORD-004,12.982245,77.628007,10,115,152,12,normal,IND,Indiranagar,Arjun Deshpande,"38, Double Road, Indiranagar",560038,+91 9852243004,Apparel parcel,739
+ORD-005,12.98501,77.648275,8,162,213,11,normal,IND,Indiranagar,Lakshmi Rao,"45, 100 Feet Road, Indiranagar",560038,+91 9865243005,Fresh produce crate,824
+ORD-006,12.945012,77.631187,5,52,94,10,critical,KOR,Koramangala,Nikhil Sharma,"52, 5th Block, Koramangala",560095,+91 9878243006,Household kit,0
+ORD-007,12.925461,77.630174,11,88,133,11,normal,KOR,Koramangala,Diya Krishnan,"59, Forum Junction, Koramangala",560095,+91 9801243007,Documents + ID kit,994
+ORD-008,12.927655,77.632471,10,97,142,10,normal,KOR,Koramangala,Farhan Ali,"66, Sarjapur Road, Koramangala",560095,+91 9814243008,Baby-care bundle,1079
+ORD-009,12.919814,77.626741,9,121,164,13,normal,KOR,Koramangala,Ananya Gupta,"73, 80 Feet Road, Koramangala",560095,+91 9827243009,Grocery mix (8 kg),1164
+ORD-010,12.942284,77.631769,8,82,126,12,normal,KOR,Koramangala,Vikram Nair,"80, 5th Block, Koramangala",560095,+91 9840243010,Pharmacy cold-chain,1249
+ORD-011,12.929688,77.576117,4,132,168,9,critical,JPN,Jayanagar,Pooja Reddy,"87, 9th Main, Jayanagar",560041,+91 9853243011,Electronics — 1 unit,0
+ORD-012,12.920922,77.57075,10,22,62,13,normal,JPN,Jayanagar,Karthik Iyer,"14, Jayanagar Club, Jayanagar",560041,+91 9866243012,Apparel parcel,1419
+ORD-013,12.920139,77.580224,9,48,92,13,normal,JPN,Jayanagar,Aisha Khan,"21, 4th Block, Jayanagar",560041,+91 9879243013,Fresh produce crate,1504
+ORD-014,12.929169,77.592982,8,95,133,12,normal,JPN,Jayanagar,Rohan Joshi,"28, South End Circle, Jayanagar",560041,+91 9802243014,Household kit,1589
+ORD-015,12.918436,77.63239,5,116,160,11,critical,HSR,HSR Layout,Nandini Rao,"35, Sector 2, HSR Layout",560102,+91 9815243015,Documents + ID kit,0
+ORD-016,12.905909,77.651906,11,88,128,13,normal,HSR,HSR Layout,Imran Patel,"42, HSR Club Road, HSR Layout",560102,+91 9828243016,Baby-care bundle,1759
+ORD-017,12.922179,77.656617,10,126,164,10,normal,HSR,HSR Layout,Shreya Kulkarni,"49, 27th Main, HSR Layout",560102,+91 9841243017,Grocery mix (8 kg),1844
+ORD-018,12.905223,77.638741,9,59,107,12,normal,HSR,HSR Layout,Aditya Verma,"56, BDA Complex, HSR Layout",560102,+91 9854243018,Pharmacy cold-chain,1929
+ORD-019,12.962858,77.749262,6,93,131,13,critical,WHT,Whitefield,Fatima Sheikh,"63, Varthur Road, Whitefield",560066,+91 9867243019,Electronics — 1 unit,0
+ORD-020,12.974102,77.737069,12,72,110,10,normal,WHT,Whitefield,Siddharth Rao,"70, Hope Farm, Whitefield",560066,+91 9880243020,Apparel parcel,2099
+ORD-021,12.976487,77.742875,11,90,128,10,normal,WHT,Whitefield,Kavya Nambiar,"77, ITPL Main Road, Whitefield",560066,+91 9803243021,Fresh produce crate,2184
+ORD-022,12.980526,77.754728,10,103,141,11,normal,WHT,Whitefield,Mohammed Irfan,"84, Graphite India, Whitefield",560066,+91 9816243022,Household kit,2269
+ORD-023,12.971692,77.73863,9,164,202,11,normal,WHT,Whitefield,Tanvi Shah,"11, Varthur Road, Whitefield",560066,+91 9829243023,Documents + ID kit,2354
+ORD-024,12.960982,77.750996,8,65,103,11,normal,WHT,Whitefield,Harshvardhan Rao,"18, Hope Farm, Whitefield",560066,+91 9842243024,Baby-care bundle,2439

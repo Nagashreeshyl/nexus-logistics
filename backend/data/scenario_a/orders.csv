@@ -1,0 +1,17 @@
+order_id,lat,lon,demand,tw_start,tw_end,service_min,priority,zone,zone_name,customer,address,pincode,phone,sku,cod_inr
+ORD-001,12.97504,77.648753,5,36,90,12,critical,IND,Indiranagar,Meera Iyer,"17, 100 Feet Road, Indiranagar",560038,+91 9813243001,Grocery mix (8 kg),0
+ORD-002,12.983377,77.6292,6,39,110,11,normal,IND,Indiranagar,Rahul Menon,"24, CMH Road, Indiranagar",560038,+91 9826243002,Pharmacy cold-chain,569
+ORD-003,12.973505,77.645852,5,75,144,8,normal,IND,Indiranagar,Sana Qureshi,"31, 12th Main, Indiranagar",560038,+91 9839243003,Electronics — 1 unit,654
+ORD-004,12.982227,77.643535,7,118,174,11,normal,IND,Indiranagar,Arjun Deshpande,"38, Double Road, Indiranagar",560038,+91 9852243004,Apparel parcel,739
+ORD-005,12.994009,77.647216,4,131,189,11,critical,IND,Indiranagar,Lakshmi Rao,"45, 100 Feet Road, Indiranagar",560038,+91 9865243005,Fresh produce crate,0
+ORD-006,12.937735,77.626996,6,22,75,8,critical,KOR,Koramangala,Nikhil Sharma,"52, 5th Block, Koramangala",560095,+91 9878243006,Household kit,0
+ORD-007,12.944927,77.625276,5,26,85,10,normal,KOR,Koramangala,Diya Krishnan,"59, Forum Junction, Koramangala",560095,+91 9801243007,Documents + ID kit,994
+ORD-008,12.93377,77.612074,6,74,122,12,normal,KOR,Koramangala,Farhan Ali,"66, Sarjapur Road, Koramangala",560095,+91 9814243008,Baby-care bundle,1079
+ORD-009,12.920721,77.622152,5,98,159,9,normal,KOR,Koramangala,Ananya Gupta,"73, 80 Feet Road, Koramangala",560095,+91 9827243009,Grocery mix (8 kg),1164
+ORD-010,12.937777,77.615039,7,77,143,10,normal,KOR,Koramangala,Vikram Nair,"80, 5th Block, Koramangala",560095,+91 9840243010,Pharmacy cold-chain,1249
+ORD-011,12.920871,77.573303,5,100,168,8,critical,JPN,Jayanagar,Pooja Reddy,"87, 9th Main, Jayanagar",560041,+91 9853243011,Electronics — 1 unit,0
+ORD-012,12.927348,77.583369,6,42,108,12,normal,JPN,Jayanagar,Karthik Iyer,"14, Jayanagar Club, Jayanagar",560041,+91 9866243012,Apparel parcel,1419
+ORD-013,12.913294,77.591742,4,47,107,10,normal,JPN,Jayanagar,Aisha Khan,"21, 4th Block, Jayanagar",560041,+91 9879243013,Fresh produce crate,1504
+ORD-014,12.923492,77.595376,6,37,107,8,normal,JPN,Jayanagar,Rohan Joshi,"28, South End Circle, Jayanagar",560041,+91 9802243014,Household kit,1589
+ORD-015,12.920648,77.646676,5,77,142,8,normal,HSR,HSR Layout,Nandini Rao,"35, Sector 2, HSR Layout",560102,+91 9815243015,Documents + ID kit,1674
+ORD-016,12.911838,77.643528,6,93,147,8,normal,HSR,HSR Layout,Imran Patel,"42, HSR Club Road, HSR Layout",560102,+91 9828243016,Baby-care bundle,1759
