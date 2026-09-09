@@ -10,8 +10,8 @@ import { FleetPage } from "./FleetPage";
 import { CustomersPage } from "./CustomersPage";
 import { DriversPage, DriverDetailPage } from "./DriversPage";
 import { OrdersPage } from "./OrdersPage";
-
 import { OptimizePage } from "./OptimizePage";
+import { ExceptionsPage } from "./ExceptionsPage";
 
 function WorkspaceHeader({ role }: { role: Role }) {
   const identity = WORKSPACE_IDENTITY[role];
@@ -100,6 +100,7 @@ export function AnalystHome() {
       <Route path="drivers" element={<DriversPage readOnly basePath="/analyst/drivers" />} />
       <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/analyst/drivers" />} />
       <Route path="customers" element={<CustomersPage readOnly />} />
+      <Route path="exceptions" element={<ExceptionsPage />} />
       <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );
@@ -125,6 +126,7 @@ export function DispatcherHome() {
       <Route path="drivers" element={<DriversPage basePath="/dispatcher/drivers" />} />
       <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/dispatcher/drivers" />} />
       <Route path="customers" element={<CustomersPage />} />
+      <Route path="exceptions" element={<ExceptionsPage />} />
       <Route path="optimize" element={<OptimizePage />} />
       <Route path="realtime-lab" element={<RealtimeTestConsolePage />} />
       <Route path="*" element={<Navigate to="." replace />} />

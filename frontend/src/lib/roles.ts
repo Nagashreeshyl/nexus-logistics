@@ -81,7 +81,7 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
     { label: "Fleet", to: "/dispatcher/fleet" },
     { label: "Drivers", to: "/dispatcher/drivers" },
     { label: "Customers", to: "/dispatcher/customers" },
-    { label: "Exceptions", soon: true },
+    { label: "Exceptions", to: "/dispatcher/exceptions" },
     { label: "Optimize", to: "/dispatcher/optimize" },
     { label: "Scenarios", soon: true },
   ],
@@ -97,7 +97,7 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
     { label: "Drivers", to: "/analyst/drivers" },
     { label: "Customers", to: "/analyst/customers" },
     { label: "Performance", soon: true },
-    { label: "Exceptions", soon: true },
+    { label: "Exceptions", to: "/analyst/exceptions" },
   ],
 };
 
