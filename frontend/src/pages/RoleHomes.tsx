@@ -13,6 +13,7 @@ import { OrdersPage } from "./OrdersPage";
 import { OptimizePage } from "./OptimizePage";
 import { ExceptionsPage } from "./ExceptionsPage";
 import { ScenarioStudioPage } from "./ScenarioStudioPage";
+import { AnalystDashboardPage } from "./AnalystDashboardPage";
 
 function WorkspaceHeader({ role }: { role: Role }) {
   const identity = WORKSPACE_IDENTITY[role];
@@ -95,13 +96,15 @@ export function AdminHome() {
 export function AnalystHome() {
   return (
     <Routes>
-      <Route index element={<ProfileCard role="analyst" />} />
+      <Route index element={<AnalystDashboardPage />} />
       <Route path="orders" element={<OrdersPage readOnly />} />
+      <Route path="deliveries" element={<DispatcherOpsPage />} />
       <Route path="fleet" element={<FleetPage readOnly />} />
       <Route path="drivers" element={<DriversPage readOnly basePath="/analyst/drivers" />} />
       <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/analyst/drivers" />} />
       <Route path="customers" element={<CustomersPage readOnly />} />
       <Route path="exceptions" element={<ExceptionsPage />} />
+      <Route path="performance" element={<AnalystDashboardPage />} />
       <Route path="*" element={<Navigate to="." replace />} />
     </Routes>
   );

@@ -93,10 +93,10 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
   analyst: [
     { label: "Overview", to: "/analyst" },
     { label: "Orders", to: "/analyst/orders" },
+    { label: "Deliveries", to: "/analyst/deliveries" },
     { label: "Fleet", to: "/analyst/fleet" },
     { label: "Drivers", to: "/analyst/drivers" },
-    { label: "Customers", to: "/analyst/customers" },
-    { label: "Performance", soon: true },
+    { label: "Performance", to: "/analyst/performance" },
     { label: "Exceptions", to: "/analyst/exceptions" },
   ],
 };
