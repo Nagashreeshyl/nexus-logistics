@@ -9,12 +9,11 @@ import { OptimizerLabPage } from "./pages/OptimizerLabPage";
 import { LoginPage } from "./pages/LoginPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { AdminHome, AnalystHome, DispatcherHome, DriverHome } from "./pages/RoleHomes";
-import { Console } from "./pages/Console";
 
 /**
- * Primary UX (hackathon): / · /presentation · /optimizer
- * Legacy ops workspaces kept for deep links / recovery — not in primary nav.
- * Dense Lab at /lab (debug); prefer /optimizer for demos.
+ * Primary UX: Presentation + V1 Optimizer Lab (Console).
+ * /optimizer is the main-branch Lab experience (light console).
+ * Legacy ops workspaces kept for deep links — not in primary nav.
  */
 export function App() {
   return (
@@ -24,10 +23,11 @@ export function App() {
           <Route element={<HackathonShell />}>
             <Route index element={<LandingPage />} />
             <Route path="presentation" element={<PresentationPage />} />
-            <Route path="optimizer" element={<OptimizerLabPage />} />
           </Route>
 
-          <Route path="/lab" element={<Console onBack={() => window.history.back()} />} />
+          {/* Full-page V1 Lab — outside shell so chrome matches main */}
+          <Route path="/optimizer" element={<OptimizerLabPage />} />
+          <Route path="/lab" element={<Navigate to="/optimizer" replace />} />
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<RequireAuth />}>

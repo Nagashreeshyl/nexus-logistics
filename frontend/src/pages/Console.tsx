@@ -341,13 +341,13 @@ export function Console({ onBack }: ConsoleProps) {
               type="button"
               onClick={onBack}
               className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center"
-              aria-label="Back to home"
-              title="Back to home explanation"
+              aria-label="Back to presentation"
+              title="Back to presentation"
             >
               <BrandLogo className="h-9 w-9" />
             </button>
             <div>
-              <p className="font-sans text-[15px] font-semibold">Nexus delivery console</p>
+              <p className="font-sans text-[15px] font-semibold">Nexus Optimizer Lab</p>
               <p className="mt-0.5 max-w-[54ch] font-sans text-[13px] leading-snug text-mute">
                 Plan van stops for Bengaluru. Compare a naive schedule against a smart one. Rules (capacity + time
                 windows) are never broken.
