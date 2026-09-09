@@ -147,19 +147,30 @@ export function PresentationPage() {
                 &amp; Late-Delivery Risk Predictor
               </p>
               <div className="mt-8 space-y-1 font-mono text-[12px] uppercase tracking-[0.14em] text-mute opacity-0 animate-[fadeUp_0.7s_ease_0.25s_forwards]">
-                <p>Code with Errors</p>
-                <p className="normal-case tracking-normal text-ink">Naga Shreeshyl K S — TL · Nivetha · Ankitha · Skanda</p>
+                <p>Team · Code with Errors</p>
+                <p className="normal-case tracking-normal text-ink">
+                  Naga Shreeshyl K S · Nivetha · Ankitha · Skanda
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setTitleAnim(true);
-                  window.setTimeout(() => go(2), 700);
-                }}
-                className="mt-10 bg-coral px-8 py-3.5 font-sans text-[14px] font-semibold text-ink opacity-0 animate-[fadeUp_0.7s_ease_0.4s_forwards]"
-              >
-                Enter Nexus →
-              </button>
+              <div className="mt-10 flex flex-wrap gap-3 opacity-0 animate-[fadeUp_0.7s_ease_0.4s_forwards]">
+                <button
+                  type="button"
+                  onClick={openLab}
+                  className="bg-coral px-8 py-3.5 font-sans text-[14px] font-semibold text-ink"
+                >
+                  ENTER OPTIMIZER →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleAnim(true);
+                    window.setTimeout(() => go(2), 700);
+                  }}
+                  className="border border-hairline bg-snow px-8 py-3.5 font-sans text-[14px] font-semibold text-ink"
+                >
+                  Start presentation
+                </button>
+              </div>
             </div>
             <svg viewBox="0 0 280 220" className="mx-auto w-full max-w-sm" aria-hidden>
               <circle cx="50" cy="110" r="10" fill="#92CFF2" stroke="#0A0A0A" strokeWidth="2" />
@@ -215,20 +226,30 @@ export function PresentationPage() {
             Why is last-mile delivery hard?
           </h2>
           <p className="mt-2 font-sans text-[15px] text-mute">
-            Bengaluru · 20–30 orders · limited vans · different capacities · different time windows · priorities
+            Many overlapping constraints must resolve into one feasible same-day plan.
           </p>
+          <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[12px] font-semibold">
+            {["ORDERS", "CAPACITY", "TIME WINDOWS", "DISTANCE", "DELIVERY RISK"].map((label, i) => (
+              <span key={label} className="flex items-center gap-2">
+                {i > 0 && <span className="text-mute">+</span>}
+                <span className="border border-ink bg-snow px-3 py-2">{label}</span>
+              </span>
+            ))}
+            <span className="text-mute">→</span>
+            <span className="border border-coral bg-[#FFF5F2] px-3 py-2 text-coral">ONE FEASIBLE PLAN</span>
+          </div>
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <div className="border border-hairline bg-snow p-4 font-sans text-[13px]">
-              <p className="font-mono text-[10px] text-mute">ORD-1042</p>
-              <p className="mt-1 font-semibold">10:00–10:45 · 12 kg · HIGH</p>
+              <p className="font-mono text-[10px] text-mute">ORD-1042 · example shape</p>
+              <p className="mt-1 font-semibold">10:00–10:45 · demand · CRITICAL</p>
             </div>
             <div className="border border-hairline bg-snow p-4 font-sans text-[13px]">
-              <p className="font-mono text-[10px] text-mute">ORD-1048</p>
-              <p className="mt-1 font-semibold">10:30–12:00 · 8 kg · NORMAL</p>
+              <p className="font-mono text-[10px] text-mute">ORD-1048 · example shape</p>
+              <p className="mt-1 font-semibold">10:30–12:00 · demand · NORMAL</p>
             </div>
             <div className="border border-hairline bg-snow p-4 font-sans text-[13px]">
-              <p className="font-mono text-[10px] text-mute">V03</p>
-              <p className="mt-1 font-semibold">Capacity 50 kg</p>
+              <p className="font-mono text-[10px] text-mute">V03 · example shape</p>
+              <p className="mt-1 font-semibold">Finite capacity · shift window</p>
             </div>
           </div>
           <p className="mt-5 font-sans text-[14px] text-mute">
@@ -323,8 +344,14 @@ export function PresentationPage() {
           <div className="mt-8 border border-ink bg-snow px-5 py-5">
             <p className="font-sans text-[28px] font-semibold tracking-tight">CVRPTW</p>
             <p className="mt-1 font-sans text-[15px] text-mute">Capacitated Vehicle Routing Problem with Time Windows</p>
-            <p className="mt-3 max-w-2xl font-sans text-[15px]">
-              We use CVRPTW because our vehicles have capacity limits and our deliveries have time windows.
+            <ul className="mt-4 grid gap-2 font-sans text-[14px] sm:grid-cols-2">
+              <li>· Vehicles with capacity + shift windows</li>
+              <li>· Orders with demand + delivery windows</li>
+              <li>· Shared depot / return structure</li>
+              <li>· Sequence decisions under hard constraints</li>
+            </ul>
+            <p className="mt-4 border-t border-hairline pt-3 font-sans text-[15px] font-semibold text-coral">
+              Hard constraints stay hard.
             </p>
           </div>
         </SlideFrame>
@@ -335,60 +362,44 @@ export function PresentationPage() {
         <SlideFrame>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-coral">Architecture</p>
           <h2 className="mt-2 font-sans text-[clamp(1.8rem,4vw,2.8rem)] font-semibold">How Nexus works</h2>
-          <div className="mt-8 flex flex-col items-stretch gap-2 font-sans text-[13px] md:flex-row md:items-center md:gap-3">
-            <div className="border border-hairline bg-snow px-3 py-3 text-center font-semibold opacity-0 animate-[fadeUp_0.45s_ease_forwards]">
-              Delivery data
-            </div>
-            <span className="hidden text-mute md:inline">→</span>
-            <div className="border border-hairline bg-snow px-3 py-3 text-center opacity-0 animate-[fadeUp_0.45s_ease_0.08s_forwards]">
-              Scenario
-            </div>
-            <span className="hidden text-mute md:inline">→</span>
-            <button
-              type="button"
-              onClick={() => setArchFocus("fastapi")}
-              className={`border px-3 py-3 text-center font-semibold opacity-0 animate-[fadeUp_0.45s_ease_0.16s_forwards] ${
-                archFocus === "fastapi" ? "border-coral bg-[#FFF5F2]" : "border-hairline bg-snow"
-              }`}
-            >
-              FastAPI
-            </button>
-            <span className="hidden text-mute md:inline">→</span>
-            <div className="flex flex-col gap-2 opacity-0 animate-[fadeUp_0.45s_ease_0.24s_forwards]">
-              <button
-                type="button"
-                onClick={() => setArchFocus("ortools")}
-                className={`border px-3 py-2 text-left font-semibold ${
-                  archFocus === "ortools" ? "border-coral bg-[#FFF5F2]" : "border-hairline bg-snow"
-                }`}
-              >
-                OR-Tools CVRPTW
-              </button>
-              <button
-                type="button"
-                onClick={() => setArchFocus("ml")}
-                className={`border px-3 py-2 text-left font-semibold ${
-                  archFocus === "ml" ? "border-coral bg-[#FFF5F2]" : "border-hairline bg-snow"
-                }`}
-              >
-                Gradient Boosting
-              </button>
-            </div>
-            <span className="hidden text-mute md:inline">→</span>
-            <div className="border border-ink bg-snow px-3 py-3 text-center font-semibold opacity-0 animate-[fadeUp_0.45s_ease_0.32s_forwards]">
-              Routes + risk → map
-            </div>
+          <div className="mt-8 flex flex-col gap-2 font-sans text-[13px]">
+            {[
+              "Orders",
+              "Distance / Travel Time (OSRM → haversine)",
+              "Late Risk ML (GradientBoosting)",
+              "OR-Tools CVRPTW",
+              "Baseline vs Nexus",
+              "Map / Risk / Decision Support",
+            ].map((label, i) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="font-mono text-[10px] text-mute">{String(i + 1).padStart(2, "0")}</span>
+                <div className="flex-1 border border-hairline bg-snow px-4 py-3 font-semibold">{label}</div>
+                {i < 5 && <span className="hidden text-mute sm:inline">↓</span>}
+              </div>
+            ))}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setArchFocus("osrm")} className="border border-hairline bg-snow px-3 py-1.5 text-[12px] font-semibold">
-              OSRM
-            </button>
-            <button type="button" onClick={() => setArchFocus("haversine")} className="border border-hairline bg-snow px-3 py-1.5 text-[12px] font-semibold">
-              Haversine fallback
-            </button>
-            <button type="button" onClick={() => setArchFocus("leaflet")} className="border border-hairline bg-snow px-3 py-1.5 text-[12px] font-semibold">
-              Leaflet map
-            </button>
+            {(
+              [
+                ["fastapi", "FastAPI"],
+                ["ortools", "OR-Tools"],
+                ["ml", "ML risk"],
+                ["osrm", "OSRM"],
+                ["haversine", "Haversine"],
+                ["leaflet", "Leaflet"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setArchFocus(key)}
+                className={`border px-3 py-1.5 text-[12px] font-semibold ${
+                  archFocus === key ? "border-coral bg-[#FFF5F2]" : "border-hairline bg-snow"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           {archFocus && (
             <p className="mt-5 max-w-2xl border border-hairline bg-snow px-4 py-3 font-sans text-[14px] text-mute">
@@ -418,16 +429,23 @@ export function PresentationPage() {
             </div>
             <div className="border border-hairline bg-snow p-5 font-sans text-[14px]">
               <p className="font-mono text-[11px] uppercase text-mute">Google OR-Tools · 9.11</p>
-              <p className="mt-3">
-                <span className="font-semibold">PATH_CHEAPEST_ARC</span>
-                <br />
-                <span className="text-mute">First solution — builds an initial routing plan.</span>
-              </p>
-              <p className="mt-3">
-                <span className="font-semibold">GUIDED_LOCAL_SEARCH</span>
-                <br />
-                <span className="text-mute">Improves routes, escapes poor local solutions.</span>
-              </p>
+              <ol className="mt-3 space-y-3">
+                <li>
+                  <span className="font-semibold">PATH_CHEAPEST_ARC</span>
+                  <br />
+                  <span className="text-mute">Initial solution — cheap first routing plan.</span>
+                </li>
+                <li className="text-mute">↓</li>
+                <li>
+                  <span className="font-semibold">GUIDED_LOCAL_SEARCH</span>
+                  <br />
+                  <span className="text-mute">Local improvement while preserving hard constraints.</span>
+                </li>
+                <li className="text-mute">↓</li>
+                <li>
+                  <span className="font-semibold text-coral">Feasible route plan</span>
+                </li>
+              </ol>
               <p className="mt-4 border-t border-hairline pt-3 font-semibold text-coral">
                 Hard constraints stay hard. ML never relaxes capacity or windows.
               </p>
@@ -464,7 +482,20 @@ export function PresentationPage() {
             <br />
             ML tells us what may go wrong.
           </h2>
-          <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            <div className="border border-hairline bg-snow p-4">
+              <p className="font-mono text-[10px] uppercase text-mute">ML</p>
+              <p className="mt-1 font-sans text-[16px] font-semibold">Risk intelligence</p>
+              <p className="mt-2 font-sans text-[13px] text-mute">Predicts late-delivery probability. Advisory only.</p>
+            </div>
+            <div className="border border-ink bg-snow p-4">
+              <p className="font-mono text-[10px] uppercase text-mute">OR-Tools</p>
+              <p className="mt-1 font-sans text-[16px] font-semibold">Constraint-aware optimization</p>
+              <p className="mt-2 font-sans text-[13px] text-mute">Finds a feasible plan. Hard capacity + windows stay hard.</p>
+            </div>
+          </div>
+          <p className="mt-4 font-sans text-[15px] font-semibold text-ink">ML ≠ Route Solver</p>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
             <div className="border border-hairline bg-snow px-4 py-3 font-sans text-[14px] font-semibold">Route plan + features</div>
             <span className="text-mute">→</span>
             <div className="bg-coral px-4 py-3 font-sans text-[14px] font-semibold">GradientBoostingClassifier</div>
@@ -510,8 +541,8 @@ export function PresentationPage() {
       {/* SLIDE 7 */}
       {slide === 7 && (
         <SlideFrame>
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-coral">Live demo</p>
-          <h2 className="mt-2 font-sans text-[clamp(2rem,5vw,3.4rem)] font-semibold leading-tight">Let&apos;s see it work.</h2>
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-coral">Live Optimizer Lab</p>
+          <h2 className="mt-2 font-sans text-[clamp(2rem,5vw,3.4rem)] font-semibold leading-tight">Live Optimizer Lab</h2>
           <p className="mt-3 font-sans text-[16px] text-mute">
             Fresh Bengaluru synthetic scenario · real OR-Tools · real late-risk model
           </p>
@@ -645,8 +676,13 @@ export function PresentationPage() {
             </p>
           )}
           <div className="mt-12">
-            <h1 className="font-sans text-[clamp(2rem,6vw,3.4rem)] font-semibold">NEXUS LOGISTICS</h1>
-            <p className="mt-2 font-sans text-[18px] text-mute">Smarter routes. Fewer delays. Better decisions.</p>
+            <p className="max-w-xl font-sans text-[18px] leading-snug text-ink">
+              Constraint-aware routing + late-risk intelligence + disruption recovery.
+            </p>
+            <h1 className="mt-8 font-sans text-[clamp(2rem,6vw,3.4rem)] font-semibold">NEXUS LOGISTICS</h1>
+            <p className="mt-3 max-w-lg font-sans text-[20px] font-semibold leading-snug text-ink">
+              Nexus turns delivery planning into an adaptive decision engine.
+            </p>
             <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-mute">
               Avishkara&apos;26 · JP-019 · Code with Errors
             </p>
