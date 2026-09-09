@@ -199,13 +199,26 @@ def test_ops_active_role_requires_auth():
 
 def test_lab_synthetic_generates_varying_scenarios():
     a = client.post("/api/lab/synthetic?seed=111")
-    b = client.post("/api/lab/synthetic?seed=222")
-    assert a.status_code == 200 and b.status_code == 200
-    pa, pb = a.json(), b.json()
+    assert a.status_code == 200
+    pa = a.json()
+    assert pa["scenario_id"] == "lab"
     assert pa["summary"]["orders"] >= 12
     assert pa["summary"]["vehicles"] >= 3
-    assert pa["scenario_id"] != pb["scenario_id"] or pa["summary"] != pb["summary"]
     assert all("lat" in o and "lon" in o and "demand" in o for o in pa["orders"])
+    detail = client.get("/api/scenarios/lab")
+    assert detail.status_code == 200
+    assert len(detail.json()["orders"]) == pa["summary"]["orders"]
+
+    b = client.post("/api/lab/synthetic?seed=222")
+    assert b.status_code == 200
+    pb = b.json()
+    assert pb["scenario_id"] == "lab"
+    assert pa["generation_id"] != pb["generation_id"]
+    assert pa["summary"] != pb["summary"] or [o["order_id"] for o in pa["orders"]] != [
+        o["order_id"] for o in pb["orders"]
+    ]
+    detail_b = client.get("/api/scenarios/lab")
+    assert len(detail_b.json()["orders"]) == pb["summary"]["orders"]
 
 
 def test_lab_run_real_optimizer():

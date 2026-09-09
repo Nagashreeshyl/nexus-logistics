@@ -9,14 +9,20 @@ const STAGES = [
 ];
 
 interface LoadingOverlayProps {
-  mode: "baseline" | "optimize" | "compare" | null;
+  mode: "baseline" | "optimize" | "compare" | "synthetic" | null;
   stageIndex: number;
 }
 
 export function LoadingOverlay({ mode, stageIndex }: LoadingOverlayProps) {
   if (!mode) return null;
   const label =
-    mode === "compare" ? "Comparing baseline vs optimize" : mode === "baseline" ? "Running baseline" : "Optimizing routes";
+    mode === "compare"
+      ? "Comparing baseline vs optimize"
+      : mode === "baseline"
+        ? "Running baseline"
+        : mode === "synthetic"
+          ? "Generating synthetic day"
+          : "Optimizing routes";
   const active = Math.min(stageIndex, STAGES.length - 1);
 
   return (

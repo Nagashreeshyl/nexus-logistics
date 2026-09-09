@@ -31,6 +31,7 @@ export interface LabVehicle {
 
 export interface LabScenarioPayload {
   scenario_id: string;
+  generation_id?: string;
   seed: number;
   code: string;
   name: string;

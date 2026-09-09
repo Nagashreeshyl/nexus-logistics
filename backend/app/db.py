@@ -176,7 +176,82 @@ def _seed(conn: sqlite3.Connection) -> None:
 
 
 def list_scenarios() -> list[Scenario]:
-    return [load_scenario(s) for s in ("a", "b")]
+    ids = ["a", "b"]
+    with db() as conn:
+        if conn.execute("SELECT 1 FROM scenarios WHERE id='lab'").fetchone():
+            ids.append("lab")
+    return [load_scenario(s) for s in ids]
+
+
+def replace_scenario(
+    scenario: Scenario,
+    *,
+    code: str,
+    name: str,
+    depot_address: str = "",
+) -> None:
+    """Replace all rows for a scenario id (used for regenerating the Lab synthetic day)."""
+    sid = scenario.id.lower()
+    with db() as conn:
+        conn.execute("DELETE FROM holds WHERE scenario_id=?", (sid,))
+        conn.execute("DELETE FROM solve_runs WHERE scenario_id=?", (sid,))
+        conn.execute("DELETE FROM orders WHERE scenario_id=?", (sid,))
+        conn.execute("DELETE FROM vehicles WHERE scenario_id=?", (sid,))
+        conn.execute(
+            "INSERT OR REPLACE INTO scenarios(id, code, name) VALUES (?,?,?)",
+            (sid, code, name),
+        )
+        for v in scenario.vehicles:
+            conn.execute(
+                """
+                INSERT INTO vehicles(
+                  scenario_id, vehicle_id, capacity, depot_lat, depot_lon, shift_start, shift_end,
+                  driver, plate, phone, rating, depot_address
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    sid,
+                    v.vehicle_id,
+                    int(v.capacity),
+                    float(v.depot_lat),
+                    float(v.depot_lon),
+                    int(v.shift_start),
+                    int(v.shift_end),
+                    v.driver or "",
+                    v.plate or "",
+                    v.phone or "",
+                    float(v.rating or 0),
+                    depot_address or v.depot_address or "",
+                ),
+            )
+        for o in scenario.orders:
+            conn.execute(
+                """
+                INSERT INTO orders(
+                  scenario_id, order_id, lat, lon, demand, tw_start, tw_end, service_min, priority,
+                  zone, zone_name, customer, address, pincode, phone, sku, cod_inr
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    sid,
+                    o.order_id,
+                    float(o.lat),
+                    float(o.lon),
+                    int(o.demand),
+                    int(o.tw_start),
+                    int(o.tw_end),
+                    int(o.service_min),
+                    o.priority,
+                    o.zone or "",
+                    o.zone_name or o.zone or "",
+                    o.customer or "",
+                    o.address or "",
+                    o.pincode or "",
+                    o.phone or "",
+                    o.sku or "",
+                    int(o.cod_inr or 0),
+                ),
+            )
 
 
 def load_scenario(scenario_id: str) -> Scenario:

@@ -17,7 +17,7 @@ from .cache import cache
 from .compare import improvement_rows, narrative_summary
 from .data_loader import list_scenarios, load_scenario
 from .distance import force_haversine
-from .lab_synthetic import generate_lab_scenario
+from .lab_synthetic import LAB_SCENARIO_ID, generate_lab_scenario
 from .live_scenario import scenario_from_live
 from .metrics import snap_roads
 from .models import (
@@ -36,6 +36,9 @@ from .optimizer import run_optimize
 from .firebase_app import auth_mode, firebase_auth_ready, firebase_configured, init_firebase
 from .risk import DATA_DISCLOSURE, RiskModel
 from .weather import fetch_weather
+
+# Content fingerprint so regenerating Lab synthetic day does not reuse stale solve cache.
+_SCENARIO_CONTENT_FP: dict[str, str] = {}
 
 _LOCALHOST_ORIGINS = [
     "http://127.0.0.1:5173",
@@ -80,7 +83,8 @@ def _holds_fingerprint(scenario_id: str) -> str:
 
 
 def _solve_cache_key(scenario_id: str, mode: str) -> str:
-    raw = f"{scenario_id}:{mode}:{_holds_fingerprint(scenario_id)}:{WEATHER.get('wet')}"
+    content = _SCENARIO_CONTENT_FP.get(scenario_id.lower(), "")
+    raw = f"{scenario_id}:{mode}:{_holds_fingerprint(scenario_id)}:{WEATHER.get('wet')}:{content}"
     return "solve:" + hashlib.sha1(raw.encode()).hexdigest()
 
 
@@ -222,9 +226,24 @@ class LabRunBody(BaseModel):
 
 @app.post("/api/lab/synthetic")
 def lab_synthetic(seed: int | None = Query(default=None)) -> dict[str, Any]:
-    """Generate a NEW Bengaluru CVRPTW scenario (not static A/B)."""
-    _, payload = generate_lab_scenario(seed)
+    """Generate a NEW Bengaluru CVRPTW scenario and persist it as `lab` (same APIs as Day A/B)."""
+    scenario, payload = generate_lab_scenario(seed)
+    scenario.id = LAB_SCENARIO_ID
+    db.replace_scenario(
+        scenario,
+        code=str(payload.get("code") or "LAB"),
+        name=str(payload.get("name") or "Synthetic Bengaluru Lab"),
+        depot_address=str(payload.get("depot_address") or "Nexus Hub, Richmond Road, Bengaluru"),
+    )
+    _SCENARIO_CONTENT_FP[LAB_SCENARIO_ID] = str(payload.get("seed") or payload.get("generation_id") or time_token())
+    payload["scenario_id"] = LAB_SCENARIO_ID
     return payload
+
+
+def time_token() -> str:
+    import time
+
+    return str(int(time.time_ns()))
 
 
 @app.post("/api/lab/run")

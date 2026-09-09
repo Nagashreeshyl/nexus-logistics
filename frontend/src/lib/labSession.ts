@@ -1,4 +1,4 @@
-/** Persist Lab run metrics for Presentation slide 8 + return navigation. */
+/** Persist Lab run metrics for Presentation slides 8–9 + return navigation. */
 
 const KEY = "nexus-lab-session-v1";
 
@@ -10,6 +10,7 @@ export interface LabSessionSnapshot {
     vehicles: number;
     critical: number;
     total_demand: number;
+    generation_id?: string;
   };
   metrics?: {
     before: {
@@ -26,6 +27,15 @@ export interface LabSessionSnapshot {
       feasible: boolean;
       partial: boolean;
     };
+    updatedAt: string;
+  };
+  disruption?: {
+    vehicle_id: string;
+    affected_orders: number;
+    before_late: number;
+    after_late: number;
+    before_distance_km: number;
+    after_distance_km: number;
     updatedAt: string;
   };
 }
@@ -54,6 +64,7 @@ export function clearLabMetrics(): void {
   const cur = readLabSession();
   delete cur.metrics;
   delete cur.summary;
+  delete cur.disruption;
   try {
     sessionStorage.setItem(KEY, JSON.stringify(cur));
   } catch {

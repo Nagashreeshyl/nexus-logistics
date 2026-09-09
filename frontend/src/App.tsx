@@ -11,8 +11,8 @@ import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { AdminHome, AnalystHome, DispatcherHome, DriverHome } from "./pages/RoleHomes";
 
 /**
- * Primary UX: Presentation + V1 Optimizer Lab (Console).
- * /optimizer is the main-branch Lab experience (light console).
+ * Primary UX: Presentation + Optimizer Lab.
+ * /optimizer is the hackathon Lab (synthetic → OR-Tools → breakdown).
  * Legacy ops workspaces kept for deep links — not in primary nav.
  */
 export function App() {

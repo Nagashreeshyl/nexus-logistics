@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
 from .live_scenario import scenario_from_live
 from .models import Scenario
+
+# Fixed SQLite id so Lab synthetic days use the same solve/hold/export APIs as Day A/B.
+LAB_SCENARIO_ID = "lab"
 
 DEPOT_LAT = 12.9716
 DEPOT_LON = 77.5946
@@ -60,7 +64,9 @@ def generate_lab_scenario(seed: int | None = None) -> tuple[Scenario, dict[str, 
     Build a new valid Scenario each call.
     Order/vehicle counts vary; coords are Bengaluru-local; fields match OR-Tools models.
     """
-    s = _Seed(seed if seed is not None else int(time.time() * 1000) & 0xFFFFFFFF)
+    if seed is None:
+        seed = (int(time.time_ns()) ^ (os.getpid() << 16) ^ int(time.time() * 1000)) & 0xFFFFFFFF
+    s = _Seed(seed)
 
     n_vehicles = 4 + s.rnd(3)  # 4..6
     n_orders = 14 + s.rnd(12)  # 14..25
@@ -95,7 +101,7 @@ def generate_lab_scenario(seed: int | None = None) -> tuple[Scenario, dict[str, 
         tw_end_h = min(17, tw_start_h + tw_width)
         orders.append(
             {
-                "order_id": f"ORD-{1000 + i + s.rnd(8000)}",
+                "order_id": f"ORD-{s.v % 9000:04d}-{i + 1:02d}",
                 "lat": round(lat, 6),
                 "lon": round(lon, 6),
                 "demand": 2 + s.rnd(7),
@@ -117,9 +123,9 @@ def generate_lab_scenario(seed: int | None = None) -> tuple[Scenario, dict[str, 
         for o in orders:
             o["demand"] = max(1, int(int(o["demand"]) * scale))
 
-    scenario_id = f"lab-{s.v:08x}"
+    generation_id = f"lab-{s.v:08x}"
     scenario = scenario_from_live(
-        scenario_id=scenario_id,
+        scenario_id=LAB_SCENARIO_ID,
         orders=orders,
         vehicles=vehicles,
         depot_lat=DEPOT_LAT,
@@ -131,7 +137,8 @@ def generate_lab_scenario(seed: int | None = None) -> tuple[Scenario, dict[str, 
     critical_n = sum(1 for o in scenario.orders if o.priority == "critical")
     total_demand = sum(o.demand for o in scenario.orders)
     payload = {
-        "scenario_id": scenario.id,
+        "scenario_id": LAB_SCENARIO_ID,
+        "generation_id": generation_id,
         "seed": s.v,
         "code": scenario.code,
         "name": scenario.name,
