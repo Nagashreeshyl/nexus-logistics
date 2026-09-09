@@ -33,6 +33,24 @@ service cloud.firestore {
       return hasRole('driver') || isAdmin();
     }
 
+    // Clients may change presentation fields only — never roles / org / status.
+    function userSelfSafeUpdate() {
+      return request.auth.uid == request.resource.data.uid
+        || !('uid' in request.resource.data)
+        || request.resource.data.uid == request.auth.uid;
+    }
+
+    function noPrivilegeEscalation() {
+      return request.resource.data.roles == resource.data.roles
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.status == resource.data.status
+        && (
+          !('driverId' in request.resource.data)
+          || request.resource.data.driverId == resource.data.driverId
+          || isAdmin()
+        );
+    }
+
     match /organizations/{orgId} {
       allow read: if inOrg(orgId);
       allow write: if inOrg(orgId) && isAdmin();
@@ -40,10 +58,19 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin() || isDispatcher());
-      allow create: if signedIn() && request.auth.uid == uid;
+      // Bootstrap empty shell — roles must be [].
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.roles.size() == 0
+        && request.resource.data.email == request.auth.token.email;
+      // Self: activeRole / displayName only. Admin: full.
       allow update: if signedIn() && (
-        request.auth.uid == uid
-        || isAdmin()
+        isAdmin()
+        || (
+          request.auth.uid == uid
+          && userSelfSafeUpdate()
+          && noPrivilegeEscalation()
+        )
       );
       allow delete: if isAdmin();
     }
@@ -51,13 +78,17 @@ service cloud.firestore {
     match /drivers/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || (isDriver() && resource.data.userId == request.auth.uid));
-      allow write: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow create, update: if signedIn() && isDispatcher()
+        && inOrg(request.resource.data.organizationId);
+      allow delete: if isAdmin();
     }
 
     match /vehicles/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || isDriver());
-      allow write: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow create, update: if signedIn() && isDispatcher()
+        && inOrg(request.resource.data.organizationId);
+      allow delete: if isAdmin();
     }
 
     match /customers/{id} {
@@ -70,7 +101,8 @@ service cloud.firestore {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || isAdmin()
             || (isDriver() && resource.data.assignedDriverUserId == request.auth.uid));
-      allow create, update: if signedIn() && (
+      allow create: if signedIn() && isDispatcher() && inOrg(request.resource.data.organizationId);
+      allow update: if signedIn() && (
         (isDispatcher() && inOrg(request.resource.data.organizationId))
         || (isDriver() && resource.data.assignedDriverUserId == request.auth.uid)
       );
@@ -85,24 +117,37 @@ service cloud.firestore {
     }
 
     match /stops/{id} {
-      allow read: if signedIn() && inOrg(resource.data.organizationId);
-      allow write: if signedIn() && (isDispatcher() || isDriver());
+      allow read: if signedIn() && inOrg(resource.data.organizationId)
+        && (isDispatcher() || isAnalyst() || isAdmin()
+            || (isDriver() && resource.data.driverUserId == request.auth.uid));
+      allow create, update: if signedIn() && (
+        (isDispatcher() && inOrg(request.resource.data.organizationId))
+        || (isDriver() && resource.data.driverUserId == request.auth.uid)
+      );
+      allow delete: if isAdmin();
     }
 
     match /deliveries/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
         && (isDispatcher() || isAnalyst() || isAdmin()
             || (isDriver() && resource.data.driverUserId == request.auth.uid));
-      allow write: if signedIn() && (
+      allow create: if signedIn() && isDispatcher();
+      allow update: if signedIn() && (
         isDispatcher()
         || (isDriver() && resource.data.driverUserId == request.auth.uid)
       );
+      allow delete: if isAdmin();
     }
 
     match /exceptions/{id} {
       allow read: if signedIn() && inOrg(resource.data.organizationId)
-        && (isDispatcher() || isAnalyst() || isAdmin());
-      allow write: if signedIn() && (isDispatcher() || isDriver());
+        && (isDispatcher() || isAnalyst() || isAdmin()
+            || (isDriver() && resource.data.driverUserId == request.auth.uid));
+      allow create, update: if signedIn() && (
+        isDispatcher()
+        || (isDriver() && resource.data.driverUserId == request.auth.uid)
+      );
+      allow delete: if isAdmin();
     }
 
     match /optimizationRuns/{id} {

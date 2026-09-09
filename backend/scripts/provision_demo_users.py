@@ -66,6 +66,7 @@ def main() -> int:
             continue
         db.collection("users").document(user.uid).set(
             {
+                "uid": user.uid,
                 "email": email,
                 "displayName": email.split("@")[0],
                 "roles": roles,

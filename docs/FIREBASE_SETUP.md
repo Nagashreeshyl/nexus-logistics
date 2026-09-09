@@ -76,11 +76,32 @@ npx -y firebase-tools@latest deploy --only firestore:rules
 
 ## 9. Emulators (recommended for tests)
 
+From `frontend/`:
+
+```bash
+npm run firebase:emulators
+```
+
+Or:
+
 ```bash
 npx -y firebase-tools@latest emulators:start --only auth,firestore
 ```
 
-Set `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` and `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` for local backend tests.
+Backend:
+
+```bash
+export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+export FIREBASE_PROJECT_ID=demo-nexus
+```
+
+Frontend (`frontend/.env.local`):
+
+```bash
+VITE_USE_FIREBASE_EMULATOR=true
+# Still need VITE_FIREBASE_* keys pointing at the same project id (demo-nexus is fine for emulators)
+```
 
 ## Compatibility note
 

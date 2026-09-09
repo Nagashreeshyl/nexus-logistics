@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test:roles": "npx --yes tsx src/lib/roles.selftest.ts",
+    "firebase:emulators": "npx -y firebase-tools@latest emulators:start --only auth,firestore"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",

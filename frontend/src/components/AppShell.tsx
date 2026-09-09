@@ -1,14 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BrandLogo } from "./BrandLogo";
 import { useAuth } from "../firebase/AuthProvider";
-import { ALL_ROLES, ROLE_HOME, Role } from "../lib/roles";
-
-const LABELS: Record<Role, string> = {
-  admin: "Admin",
-  dispatcher: "Dispatcher",
-  driver: "Driver",
-  analyst: "Analyst",
-};
+import { ALL_ROLES, ROLE_HOME, ROLE_LABEL, Role } from "../lib/roles";
 
 export function AppShell() {
   const { profile, logout, setActiveRole, status } = useAuth();
@@ -32,14 +25,15 @@ export function AppShell() {
             <label className="flex items-center gap-2 font-sans text-[12px] font-semibold text-mute">
               Role
               <select
+                aria-label="Active presentation role"
                 className="min-h-10 border border-hairline bg-paper px-3 font-sans text-[13px] font-semibold text-ink"
                 value={profile.activeRole}
                 onChange={(e) => void onRoleChange(e.target.value as Role)}
-                disabled={status !== "ready"}
+                disabled={status !== "AUTHENTICATED"}
               >
                 {ALL_ROLES.filter((r) => profile.roles.includes(r)).map((r) => (
                   <option key={r} value={r}>
-                    {LABELS[r]}
+                    {ROLE_LABEL[r]}
                   </option>
                 ))}
               </select>
@@ -64,7 +58,7 @@ export function AppShell() {
                 }`
               }
             >
-              {LABELS[r]}
+              {ROLE_LABEL[r]}
             </NavLink>
           ))}
           <NavLink

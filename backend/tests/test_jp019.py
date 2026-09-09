@@ -185,3 +185,13 @@ def test_ops_health_without_forcing_firebase():
 def test_ops_me_requires_auth():
     r = client.get("/api/ops/me")
     assert r.status_code == 401
+
+
+def test_ops_admin_ping_requires_auth():
+    r = client.get("/api/ops/admin/ping")
+    assert r.status_code == 401
+
+
+def test_ops_active_role_requires_auth():
+    r = client.post("/api/ops/me/active-role", json={"role": "driver"})
+    assert r.status_code == 401

@@ -45,12 +45,13 @@ def init_firebase() -> bool:
         cred = credentials.Certificate(info)
         firebase_admin.initialize_app(cred, {"projectId": project_id or info.get("project_id")})
     else:
-        path = Path(os.environ["GOOGLE_APPLICATION_CREDENTIALS"]).expanduser()
-        if path.exists():
+        cred_env = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+        path = Path(cred_env).expanduser() if cred_env else None
+        if path and path.exists():
             cred = credentials.Certificate(str(path))
             firebase_admin.initialize_app(cred, {"projectId": project_id} if project_id else None)
         else:
-            # Emulator / ADC
+            # Emulator / Application Default Credentials
             firebase_admin.initialize_app(options={"projectId": project_id} if project_id else None)
 
     _initialized = True

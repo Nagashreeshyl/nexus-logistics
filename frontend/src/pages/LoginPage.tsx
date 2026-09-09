@@ -1,19 +1,32 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo";
 import { useAuth } from "../firebase/AuthProvider";
 import { ROLE_HOME } from "../lib/roles";
 
 export function LoginPage() {
-  const { status, profile, login, configError } = useAuth();
+  const { status, profile, profileLoading, login, configError, authError } = useAuth();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (status === "ready" && profile) {
-    return <Navigate to={ROLE_HOME[profile.activeRole] ?? "/dispatcher"} replace />;
+  if (status === "INITIALIZING" || (status === "AUTHENTICATED" && profileLoading && !profile)) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-paper font-sans text-mute">Checking session…</div>
+    );
+  }
+
+  if (status === "AUTHENTICATED" && profile) {
+    if (profile.roles.length === 0) {
+      return <Navigate to="/unauthorized" replace />;
+    }
+    const from = (location.state as { from?: string } | null)?.from;
+    const dest =
+      from && !from.startsWith("/login") ? from : ROLE_HOME[profile.activeRole] ?? "/dispatcher";
+    return <Navigate to={dest} replace />;
   }
 
   async function onSubmit(e: FormEvent) {
@@ -36,14 +49,12 @@ export function LoginPage() {
           <BrandLogo className="h-10 w-10" />
           <div>
             <p className="font-sans text-[18px] font-semibold text-ink">Nexus Logistics</p>
-            <p className="font-sans text-[13px] text-mute">Real-time delivery operations</p>
+            <p className="font-sans text-[13px] text-mute">Sign in to operations</p>
           </div>
         </div>
 
-        {status === "misconfigured" && (
-          <p className="mt-6 border border-coral bg-paper px-3 py-2 font-sans text-[13px] text-coral">
-            {configError}
-          </p>
+        {status === "MISCONFIGURED" && (
+          <p className="mt-6 border border-coral bg-paper px-3 py-2 font-sans text-[13px] text-coral">{configError}</p>
         )}
 
         <form className="mt-8 space-y-4" onSubmit={(e) => void onSubmit(e)}>
@@ -69,18 +80,20 @@ export function LoginPage() {
               className="mt-1 w-full border border-hairline bg-paper px-3 py-2 font-mono text-[14px] text-ink outline-none focus:border-ink"
             />
           </label>
-          {error && <p className="font-sans text-[13px] text-coral">{error}</p>}
+          {(error || authError) && (
+            <p className="font-sans text-[13px] text-coral">{error || authError}</p>
+          )}
           <button
             type="submit"
-            disabled={busy || status === "misconfigured"}
+            disabled={busy || status === "MISCONFIGURED"}
             className="w-full bg-coral px-4 py-3 font-sans text-[14px] font-semibold text-ink disabled:opacity-40"
           >
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
         <p className="mt-4 font-sans text-[12px] text-mute">
-          Demo accounts must exist in Firebase Auth. Roles are provisioned via backend script — passwords are never
-          stored in the repo.
+          No demo password bypass. Create Auth users in Firebase Console, then run{" "}
+          <code className="font-mono">provision_demo_users.py</code>.
         </p>
       </div>
     </main>
