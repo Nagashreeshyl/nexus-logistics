@@ -11,7 +11,7 @@ from .auth_deps import (
     require_roles,
     require_user,
 )
-from .firebase_app import firebase_configured, init_firebase
+from .firebase_app import auth_mode, firebase_auth_ready, firebase_configured, init_firebase
 from .ops_repo import OpsRepository
 from .ops_types import ALL_ROLES
 
@@ -21,6 +21,8 @@ router = APIRouter(prefix="/api/ops", tags=["ops"])
 class HealthOpsOut(BaseModel):
     firebase_configured: bool
     firebase_initialized: bool
+    firebase_auth_ready: bool
+    auth_mode: str
     message: str
 
 
@@ -28,22 +30,36 @@ class HealthOpsOut(BaseModel):
 def ops_health() -> HealthOpsOut:
     configured = firebase_configured()
     initialized = init_firebase() if configured else False
-    msg = "Firebase Admin ready" if initialized else "Configure credentials — see docs/FIREBASE_SETUP.md"
+    ready = firebase_auth_ready()
+    mode = auth_mode()
+    if configured and initialized:
+        msg = "Firebase Admin ready"
+    elif mode == "jwt_fallback":
+        msg = "JWT fallback ready (no Admin SA) — ID tokens verified via Google certs"
+    else:
+        msg = "Configure FIREBASE_PROJECT_ID and/or Admin credentials — see docs/FIREBASE_SETUP.md"
     return HealthOpsOut(
         firebase_configured=configured,
         firebase_initialized=initialized,
+        firebase_auth_ready=ready,
+        auth_mode=mode,
         message=msg,
     )
 
 
 @router.get("/me")
 def me(claims: dict = Depends(require_authenticated_user)) -> dict:
-    profile = load_user_profile(claims["uid"])
+    profile = load_user_profile(
+        claims["uid"],
+        id_token=claims.get("_id_token"),
+        email=claims.get("email"),
+    )
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found — run provision_demo_users.py")
     return {
         "claims": {"uid": claims["uid"], "email": claims.get("email")},
         "profile": profile,
+        "auth_mode": claims.get("_auth_mode"),
         "authorization_note": "Endpoint access uses roles[]; activeRole is presentation-only.",
     }
 
@@ -152,8 +168,8 @@ def optimize_live(body: LiveOptimizeBody, claims: dict = Depends(require_user)) 
     from .baseline import run_baseline
     from .live_scenario import scenario_from_live
     from .main import risk_model
+    from .metrics import snap_roads
     from .optimizer import run_optimize
-    from .snap_roads import snap_roads
 
     try:
         scenario = scenario_from_live(

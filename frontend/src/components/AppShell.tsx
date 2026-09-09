@@ -33,7 +33,7 @@ export function AppShell() {
       void touchPresence({ uid: firebaseUser.uid, activeRole: profile.activeRole }).catch(() => undefined);
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [firebaseUser, profile, status]);
+  }, [firebaseUser, profile?.activeRole, profile?.uid, status]);
 
   useEffect(() => {
     setMobileNav(false);

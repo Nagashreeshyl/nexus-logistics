@@ -3,7 +3,7 @@ import { useAuth } from "../firebase/AuthProvider";
 import { OpsPageShell } from "../components/ops/OpsPageShell";
 import { useToast } from "../components/ops/useToast";
 import { generateOperationalScenario } from "../services/firestore/entityCrud";
-import { collection, getDocs, query, where, writeBatch, doc } from "firebase/firestore";
+import { collection, getDocs, query, where, writeBatch, doc, limit } from "firebase/firestore";
 import { getFirebase } from "../firebase/config";
 
 const PRESETS: Record<
@@ -19,6 +19,24 @@ const PRESETS: Record<
   "Time Window Stress": { vehicles: 4, drivers: 4, customers: 16, orders: 24, seed: 707, blurb: "Overlapping windows" },
   "Mixed Crisis": { vehicles: 5, drivers: 5, customers: 20, orders: 32, seed: 808, blurb: "Volume + risk + tight windows" },
 };
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms (Firestore may be rate-limited — wait and retry)`));
+    }, ms);
+    promise.then(
+      (v) => {
+        window.clearTimeout(t);
+        resolve(v);
+      },
+      (err) => {
+        window.clearTimeout(t);
+        reject(err);
+      },
+    );
+  });
+}
 
 export function ScenarioStudioPage() {
   const { profile, firebaseUser } = useAuth();
@@ -61,30 +79,63 @@ export function ScenarioStudioPage() {
     if (!profile) return;
     if (!window.confirm("Delete synthetic operational records for this organization only?")) return;
     setBusy(true);
+    setLog(["Resetting synthetic docs…"]);
     try {
       const fb = getFirebase();
       if (!fb.configured) throw new Error(fb.reason);
-      const cols = ["vehicles", "drivers", "customers", "orders", "deliveries", "exceptions"];
+      // Org-scoped query only (auto single-field index). Filter synthetic client-side.
+      // Paginate with limit so a hung/unbounded getDocs cannot freeze the demo forever.
+      const cols = [
+        "vehicles",
+        "drivers",
+        "customers",
+        "orders",
+        "deliveries",
+        "exceptions",
+        "routes",
+        "stops",
+      ];
       let deleted = 0;
       for (const name of cols) {
-        const q = query(
-          collection(fb.db, name),
-          where("organizationId", "==", profile.organizationId),
-          where("synthetic", "==", true),
-        );
-        const snap = await getDocs(q);
-        const batch = writeBatch(fb.db);
-        snap.docs.forEach((d) => {
-          batch.delete(doc(fb.db, name, d.id));
-          deleted += 1;
-        });
-        if (!snap.empty) await batch.commit();
+        push(`Scanning ${name}…`);
+        let rounds = 0;
+        let removedInCol = 0;
+        while (rounds < 40) {
+          rounds += 1;
+          const snap = await withTimeout(
+            getDocs(
+              query(
+                collection(fb.db, name),
+                where("organizationId", "==", profile.organizationId),
+                limit(80),
+              ),
+            ),
+            12_000,
+            `Scan ${name}`,
+          );
+          if (snap.empty) break;
+          const syntheticDocs = snap.docs.filter((d) => d.data().synthetic === true);
+          if (syntheticDocs.length === 0) {
+            // Page had only non-synthetic docs — stop to avoid infinite re-scan of the same page.
+            push(`${name}: no more synthetic in page (left ${snap.size} non-synthetic)`);
+            break;
+          }
+          const batch = writeBatch(fb.db);
+          syntheticDocs.forEach((d) => {
+            batch.delete(doc(fb.db, name, d.id));
+            deleted += 1;
+            removedInCol += 1;
+          });
+          await withTimeout(batch.commit(), 12_000, `Delete ${name} batch`);
+        }
+        if (removedInCol) push(`Deleted ${removedInCol} from ${name}`);
       }
       show(`Removed ${deleted} synthetic docs`);
       setReady(false);
-      setLog([`Reset complete · deleted ${deleted}`]);
+      push(`Reset complete · deleted ${deleted}`);
     } catch (e) {
       show(e instanceof Error ? e.message : String(e), "err");
+      push(`FAILED: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }

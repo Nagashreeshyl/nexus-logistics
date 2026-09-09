@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "../firebase/AuthProvider";
 import { mergeConnection, useRealtimeDeliveries } from "../hooks/useRealtimeOps";
 import { nextPrimaryTransition, DELIVERY_STATUS_LABEL, type DeliveryStatus } from "../lib/deliveryStatus";
@@ -21,6 +21,8 @@ export function DriverOpsPage() {
   const connection = mergeConnection(deliveriesQ.connection);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const liveDeliveriesRef = useRef(deliveriesQ.data);
+  liveDeliveriesRef.current = deliveriesQ.data;
 
   const mine = useMemo(() => {
     const rows = deliveriesQ.data.filter((d) => d.driverUserId === uid);
@@ -30,20 +32,35 @@ export function DriverOpsPage() {
 
   async function advance(d: OpsDelivery) {
     if (!firebaseUser || !profile) return;
-    const to = nextPrimaryTransition(d.status);
+    // Use live status from current list (avoid stale closure after listener updates).
+    const live = mine.find((x) => x.id === d.id) ?? d;
+    const to = nextPrimaryTransition(live.status);
     if (!to) return;
-    setBusyId(d.id);
+    setBusyId(live.id);
     setError(null);
+    const started = performance.now();
     try {
       await transitionDeliveryStatus({
-        delivery: d,
+        delivery: live,
         to,
         actorUid: firebaseUser.uid,
         actorEmail: profile.email,
         notifyUserIds: [firebaseUser.uid],
       });
+      console.info(
+        `[realtime] delivery ${live.id} ${live.status}→${to} write_ms=${Math.round(performance.now() - started)}`,
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
+      // Server write may have landed while the client ack timed out — trust live listener.
+      await new Promise((r) => window.setTimeout(r, 400));
+      const after = liveDeliveriesRef.current.find((x) => x.id === live.id);
+      if (after?.status === to) {
+        console.info(
+          `[realtime] delivery ${live.id} ack slow but listener shows ${to} (${Math.round(performance.now() - started)}ms)`,
+        );
+      } else {
+        setError(e instanceof Error ? e.message : "Update failed");
+      }
     } finally {
       setBusyId(null);
     }

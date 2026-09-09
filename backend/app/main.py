@@ -29,7 +29,7 @@ from .models import (
 from .nominatim import reverse as nominatim_reverse
 from .ops_api import router as ops_router
 from .optimizer import run_optimize
-from .firebase_app import firebase_configured, init_firebase
+from .firebase_app import auth_mode, firebase_auth_ready, firebase_configured, init_firebase
 from .risk import DATA_DISCLOSURE, RiskModel
 from .weather import fetch_weather
 
@@ -158,10 +158,12 @@ def health() -> dict[str, Any]:
     fb_ok = firebase_configured()
     return {
         "ok": True,
-        "version": "2.4.0",
+        "version": "2.5.0",
         "firebase": {
             "configured": fb_ok,
             "initialized": init_firebase() if fb_ok else False,
+            "auth_ready": firebase_auth_ready(),
+            "auth_mode": auth_mode(),
         },
         "weather": WEATHER,
         "routing": travel_pref,

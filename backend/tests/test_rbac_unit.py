@@ -40,7 +40,10 @@ def test_require_roles_uses_roles_not_active(monkeypatch):
         "activeRole": "admin",
         "organizationId": "nexus-demo",
     }
-    monkeypatch.setattr("app.auth_deps.load_user_profile", lambda uid: profile)
+    monkeypatch.setattr(
+        "app.auth_deps.load_user_profile",
+        lambda uid, id_token=None, email=None: profile,
+    )
     with pytest.raises(HTTPException) as exc:
         require_roles(claims, "admin")
     assert exc.value.status_code == 403
@@ -50,7 +53,10 @@ def test_require_roles_uses_roles_not_active(monkeypatch):
 
 
 def test_require_roles_missing_profile(monkeypatch):
-    monkeypatch.setattr("app.auth_deps.load_user_profile", lambda uid: None)
+    monkeypatch.setattr(
+        "app.auth_deps.load_user_profile",
+        lambda uid, id_token=None, email=None: None,
+    )
     with pytest.raises(HTTPException) as exc:
         require_roles({"uid": "missing"}, "admin")
     assert exc.value.status_code == 403
@@ -62,6 +68,9 @@ def test_multi_role_satisfies_any_authorized(monkeypatch):
         "roles": ["admin", "dispatcher", "driver", "analyst"],
         "activeRole": "driver",
     }
-    monkeypatch.setattr("app.auth_deps.load_user_profile", lambda uid: profile)
+    monkeypatch.setattr(
+        "app.auth_deps.load_user_profile",
+        lambda uid, id_token=None, email=None: profile,
+    )
     assert require_roles(claims, "admin")["activeRole"] == "driver"
     assert require_roles(claims, "dispatcher") is not None
