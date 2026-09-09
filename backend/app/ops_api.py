@@ -115,10 +115,131 @@ def create_entity(body: EntityCreate, claims: dict = Depends(require_user)) -> d
 @router.get("/entities/{collection}")
 def list_entities(collection: str, claims: dict = Depends(require_user)) -> dict:
     profile = require_roles(claims, "admin", "dispatcher", "analyst", "driver")
-    allowed = {"drivers", "vehicles", "customers", "orders", "routes", "exceptions", "auditLogs"}
+    allowed = {"drivers", "vehicles", "customers", "orders", "routes", "exceptions", "auditLogs", "optimizationRuns"}
     if collection not in allowed:
         raise HTTPException(status_code=400, detail="unknown collection")
     if collection == "auditLogs":
         require_roles(claims, "admin")
     repo = OpsRepository(profile.get("organizationId"))
     return {"items": repo.list_org(collection)}
+
+
+class LiveOptimizeBody(BaseModel):
+    organization_id: str
+    orders: list[dict] = Field(default_factory=list)
+    vehicles: list[dict] = Field(default_factory=list)
+    depot_lat: float = 12.9716
+    depot_lon: float = 77.5946
+
+
+def _solution_dict(solution) -> dict:
+    from .main import _to_out
+
+    return _to_out(solution).model_dump()
+
+
+@router.post("/optimize-live")
+def optimize_live(body: LiveOptimizeBody, claims: dict = Depends(require_user)) -> dict:
+    """
+    Run existing OR-Tools + ML on live operational payloads (from Firestore).
+    Hard constraints stay in OR-Tools; ML is advisory triage/risk only.
+    """
+    profile = require_roles(claims, "admin", "dispatcher")
+    org = str(profile.get("organizationId") or "")
+    if body.organization_id != org:
+        raise HTTPException(status_code=403, detail="organization mismatch")
+
+    from .baseline import run_baseline
+    from .live_scenario import scenario_from_live
+    from .main import risk_model
+    from .optimizer import run_optimize
+    from .snap_roads import snap_roads
+
+    try:
+        scenario = scenario_from_live(
+            scenario_id=f"live-{org}",
+            orders=body.orders,
+            vehicles=body.vehicles,
+            depot_lat=body.depot_lat,
+            depot_lon=body.depot_lon,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not scenario.orders:
+        raise HTTPException(status_code=400, detail="No open orders to optimize")
+
+    baseline = snap_roads(risk_model.attach(run_baseline(scenario), scenario.orders, scenario.vehicles))
+    triage = risk_model.triage_map(scenario.orders, scenario.vehicles)
+    optimized = snap_roads(
+        risk_model.attach(run_optimize(scenario, triage_scores=triage), scenario.orders, scenario.vehicles)
+    )
+
+    explanations: list[str] = []
+    for route in optimized.routes:
+        if not route.stops:
+            continue
+        explanations.append(
+            f"Vehicle {route.vehicle_id} selected for {len(route.stops)} stop(s); "
+            f"load {route.load}/{route.capacity} within hard capacity."
+        )
+        for stop in route.stops[:3]:
+            reasons = (stop.risk.reasons if stop.risk else []) or []
+            if reasons:
+                explanations.append(f"Order {stop.order_id} risk note: {reasons[0]}")
+    for u in optimized.unassigned:
+        explanations.append(
+            f"Order {u.order_id} deferred: no feasible vehicle/window/capacity assignment under hard constraints."
+        )
+
+    bm = baseline.metrics
+    om = optimized.metrics
+    comparison = [
+        {
+            "key": "distance_km",
+            "metric": "Distance (km)",
+            "baseline": bm.distance_km,
+            "optimized": om.distance_km,
+            "delta": round(om.distance_km - bm.distance_km, 2),
+        },
+        {
+            "key": "late_count",
+            "metric": "Late deliveries",
+            "baseline": bm.late_count,
+            "optimized": om.late_count,
+            "delta": om.late_count - bm.late_count,
+        },
+        {
+            "key": "vehicles_used",
+            "metric": "Vehicles used",
+            "baseline": bm.vehicles_used,
+            "optimized": om.vehicles_used,
+            "delta": om.vehicles_used - bm.vehicles_used,
+        },
+        {
+            "key": "unassigned_count",
+            "metric": "Deferred orders",
+            "baseline": bm.unassigned_count,
+            "optimized": om.unassigned_count,
+            "delta": om.unassigned_count - bm.unassigned_count,
+        },
+        {
+            "key": "capacity_utilization",
+            "metric": "Avg utilization",
+            "baseline": bm.capacity_utilization,
+            "optimized": om.capacity_utilization,
+            "delta": round(om.capacity_utilization - bm.capacity_utilization, 3),
+        },
+    ]
+
+    return {
+        "organization_id": org,
+        "feasible": optimized.feasible,
+        "partial": optimized.partial,
+        "baseline": _solution_dict(baseline),
+        "optimize": _solution_dict(optimized),
+        "comparison": comparison,
+        "explanations": explanations,
+        "triage_note": "ML triage may prefer risky normals when capacity allows; it never relaxes hard constraints.",
+        "ml_metrics": risk_model.evaluation(),
+    }

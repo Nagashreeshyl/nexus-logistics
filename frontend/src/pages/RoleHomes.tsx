@@ -11,6 +11,8 @@ import { CustomersPage } from "./CustomersPage";
 import { DriversPage, DriverDetailPage } from "./DriversPage";
 import { OrdersPage } from "./OrdersPage";
 
+import { OptimizePage } from "./OptimizePage";
+
 function WorkspaceHeader({ role }: { role: Role }) {
   const identity = WORKSPACE_IDENTITY[role];
   return (
@@ -123,6 +125,7 @@ export function DispatcherHome() {
       <Route path="drivers" element={<DriversPage basePath="/dispatcher/drivers" />} />
       <Route path="drivers/:driverId" element={<DriverDetailRoute basePath="/dispatcher/drivers" />} />
       <Route path="customers" element={<CustomersPage />} />
+      <Route path="optimize" element={<OptimizePage />} />
       <Route path="realtime-lab" element={<RealtimeTestConsolePage />} />
       <Route path="*" element={<Navigate to="." replace />} />
     </Routes>

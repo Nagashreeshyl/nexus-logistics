@@ -82,7 +82,8 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
     { label: "Drivers", to: "/dispatcher/drivers" },
     { label: "Customers", to: "/dispatcher/customers" },
     { label: "Exceptions", soon: true },
-    { label: "Optimize", soon: true },
+    { label: "Optimize", to: "/dispatcher/optimize" },
+    { label: "Scenarios", soon: true },
   ],
   driver: [
     { label: "My Route", to: "/driver" },
