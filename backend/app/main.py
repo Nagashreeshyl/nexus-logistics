@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 from io import StringIO
 from typing import Any
 
@@ -16,6 +17,8 @@ from .cache import cache
 from .compare import improvement_rows, narrative_summary
 from .data_loader import list_scenarios, load_scenario
 from .distance import force_haversine
+from .lab_synthetic import generate_lab_scenario
+from .live_scenario import scenario_from_live
 from .metrics import snap_roads
 from .models import (
     HoldRequest,
@@ -26,6 +29,7 @@ from .models import (
     SolutionOut,
     SolveRequest,
 )
+from pydantic import BaseModel, Field
 from .nominatim import reverse as nominatim_reverse
 from .ops_api import router as ops_router
 from .optimizer import run_optimize
@@ -33,10 +37,18 @@ from .firebase_app import auth_mode, firebase_auth_ready, firebase_configured, i
 from .risk import DATA_DISCLOSURE, RiskModel
 from .weather import fetch_weather
 
+_LOCALHOST_ORIGINS = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+]
+_ENV_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+_CORS_ORIGINS = list(dict.fromkeys([*_LOCALHOST_ORIGINS, *_ENV_ORIGINS]))
+
 app = FastAPI(title="JP-019 Nexus Last-Mile", version="2.2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=_CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -191,7 +203,86 @@ def health() -> dict[str, Any]:
             "active-role-switch",
             "realtime-firestore",
             "delivery-state-machine",
+            "lab-synthetic",
+            "lab-run",
         ],
+    }
+
+
+class LabRunBody(BaseModel):
+    """In-memory Lab scenario payload — auth-optional hackathon path."""
+
+    scenario_id: str = "lab"
+    orders: list[dict[str, Any]] = Field(default_factory=list)
+    vehicles: list[dict[str, Any]] = Field(default_factory=list)
+    exclude_vehicle_ids: list[str] = Field(default_factory=list)
+    depot_lat: float = 12.9716
+    depot_lon: float = 77.5946
+
+
+@app.post("/api/lab/synthetic")
+def lab_synthetic(seed: int | None = Query(default=None)) -> dict[str, Any]:
+    """Generate a NEW Bengaluru CVRPTW scenario (not static A/B)."""
+    _, payload = generate_lab_scenario(seed)
+    return payload
+
+
+@app.post("/api/lab/run")
+def lab_run(body: LabRunBody) -> dict[str, Any]:
+    """
+    Real baseline + OR-Tools optimize + ML risk on a Lab payload.
+    Auth-optional for hackathon demo; same engines as /api/ops/optimize-live.
+    """
+    vehicles = [v for v in body.vehicles if str(v.get("vehicle_id") or v.get("id")) not in set(body.exclude_vehicle_ids)]
+    if not body.orders:
+        raise HTTPException(status_code=400, detail="No orders in scenario")
+    if not vehicles:
+        raise HTTPException(status_code=400, detail="No vehicles available after exclusions")
+    try:
+        scenario = scenario_from_live(
+            scenario_id=body.scenario_id or "lab",
+            orders=body.orders,
+            vehicles=vehicles,
+            depot_lat=body.depot_lat,
+            depot_lon=body.depot_lon,
+        )
+        scenario.code = "LAB"
+        scenario.name = "Synthetic Bengaluru Lab"
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        baseline = snap_roads(risk_model.attach(run_baseline(scenario), scenario.orders, scenario.vehicles))
+        triage = risk_model.triage_map(scenario.orders, scenario.vehicles)
+        optimized = snap_roads(
+            risk_model.attach(
+                run_optimize(scenario, time_limit_s=10, triage_scores=triage),
+                scenario.orders,
+                scenario.vehicles,
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    base_out = _to_out(baseline)
+    opt_out = _to_out(optimized)
+    rows = improvement_rows(base_out.metrics.model_dump(), opt_out.metrics.model_dump())
+    return {
+        "scenario_id": scenario.id,
+        "excluded_vehicles": list(body.exclude_vehicle_ids),
+        "feasible": optimized.feasible,
+        "partial": optimized.partial,
+        "baseline": base_out.model_dump(),
+        "optimize": opt_out.model_dump(),
+        "comparison": rows,
+        "improvements": narrative_summary(rows),
+        "data_disclosure": DATA_DISCLOSURE,
+        "travel_source": {
+            "baseline": base_out.travel_source,
+            "optimize": opt_out.travel_source,
+        },
+        "ml_metrics": risk_model.evaluation(),
+        "triage_note": "ML triage may prefer risky normals when capacity allows; it never relaxes hard constraints.",
     }
 
 

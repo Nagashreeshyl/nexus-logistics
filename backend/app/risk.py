@@ -156,12 +156,16 @@ class RiskModel:
 
     def _load_or_train(self) -> None:
         if MODEL_PATH.exists() and META_PATH.exists():
-            blob = joblib.load(MODEL_PATH)
-            meta = json.loads(META_PATH.read_text())
-            if blob.get("version") == ARTIFACT_VERSION and blob.get("pre_clf") is not None:
-                self._apply_blob(blob)
-                self.meta = meta
-                return
+            try:
+                blob = joblib.load(MODEL_PATH)
+                meta = json.loads(META_PATH.read_text())
+                if blob.get("version") == ARTIFACT_VERSION and blob.get("pre_clf") is not None:
+                    self._apply_blob(blob)
+                    self.meta = meta
+                    return
+            except Exception:
+                # Pickle/sklearn version skew — retrain rather than crash startup.
+                pass
         self.meta = train_and_evaluate(persist=True)
         self._apply_blob(joblib.load(MODEL_PATH))
 

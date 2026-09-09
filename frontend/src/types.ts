@@ -164,4 +164,11 @@ export const VEHICLE_COLORS: Record<string, string> = {
   "VAN-1": "#0A0A0A",
   "VAN-2": "#F47C59",
   "VAN-3": "#3B82A8",
+  V01: "#0A0A0A",
+  V02: "#F47C59",
+  V03: "#3B82A8",
+  V04: "#92CFF2",
+  V05: "#E8A87C",
+  V06: "#C38D9E",
+  V07: "#41B3A3",
 };

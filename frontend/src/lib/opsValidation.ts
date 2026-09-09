@@ -26,7 +26,7 @@ export function requireNonEmpty(label: string, value: string | null | undefined)
 }
 
 export function requirePositive(label: string, value: number): number {
-  if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     throw new ValidationError(`${label} must be > 0`);
   }
   return value;
@@ -40,8 +40,15 @@ export function requireNonNegative(label: string, value: number): number {
 }
 
 export function requireCoord(label: string, value: number): number {
-  if (typeof value !== "number" || Number.isNaN(value)) {
-    throw new ValidationError(`${label} must be a number`);
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new ValidationError(`${label} must be a finite number`);
+  }
+  const key = label.toLowerCase();
+  if (key.includes("lat") && (value < -90 || value > 90)) {
+    throw new ValidationError(`${label} must be between -90 and 90`);
+  }
+  if (key.includes("lon") && (value < -180 || value > 180)) {
+    throw new ValidationError(`${label} must be between -180 and 180`);
   }
   return value;
 }

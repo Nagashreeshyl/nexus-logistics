@@ -1,34 +1,58 @@
+import { getAuth } from "firebase/auth";
 import { apiUrl } from "./lib/apiUrl";
 import type { ScenarioDetail, Solution, SolveMode, Weather } from "./types";
 
-async function parse<T>(res: Response): Promise<T> {
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Authorization")) {
+    try {
+      const user = getAuth().currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+    } catch {
+      /* Firebase not initialized — continue without auth header */
+    }
+  }
+  const res = await fetch(apiUrl(path), { ...init, headers });
   if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    if (res.status === 404 || text.includes("NOT_FOUND")) {
+      throw new Error(
+        "API unavailable (404). Backend may not be deployed. Set VITE_API_BASE_URL.",
+      );
+    }
     let detail = res.statusText;
     try {
-      const body = (await res.json()) as { detail?: string };
+      const body = JSON.parse(text) as { detail?: string };
       if (body.detail) detail = body.detail;
     } catch {
-      /* ignore */
+      if (text) detail = text.slice(0, 200);
     }
-    throw new Error(detail);
+    throw new Error(detail || `HTTP ${res.status}`);
   }
+  return res;
+}
+
+async function parse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
 export function fetchScenario(id: string): Promise<ScenarioDetail> {
-  return fetch(apiUrl(`/api/scenarios/${id}`)).then((r) => parse<ScenarioDetail>(r));
+  return apiFetch(`/api/scenarios/${id}`).then((r) => parse<ScenarioDetail>(r));
 }
 
 export function fetchWeather(): Promise<Weather> {
-  return fetch(apiUrl("/api/weather")).then((r) => parse<Weather>(r));
+  return apiFetch("/api/weather").then((r) => parse<Weather>(r));
 }
 
 export function refreshWeather(): Promise<Weather> {
-  return fetch(apiUrl("/api/weather/refresh"), { method: "POST" }).then((r) => parse<Weather>(r));
+  return apiFetch("/api/weather/refresh", { method: "POST" }).then((r) => parse<Weather>(r));
 }
 
 export function solve(scenarioId: string, mode: SolveMode): Promise<Solution> {
-  return fetch(apiUrl("/api/solve"), {
+  return apiFetch("/api/solve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scenario_id: scenarioId, mode }),
@@ -77,7 +101,7 @@ export interface CompareResult {
 }
 
 export function compare(scenarioId: string): Promise<CompareResult> {
-  return fetch(apiUrl(`/api/compare?scenario_id=${scenarioId}`), { method: "POST" }).then((r) =>
+  return apiFetch(`/api/compare?scenario_id=${scenarioId}`, { method: "POST" }).then((r) =>
     parse<CompareResult>(r),
   );
 }
@@ -121,11 +145,11 @@ export interface WinSheet {
 }
 
 export function fetchWinSheet(scenarioId: string): Promise<WinSheet> {
-  return fetch(apiUrl(`/api/winsheet?scenario_id=${scenarioId}`)).then((r) => parse<WinSheet>(r));
+  return apiFetch(`/api/winsheet?scenario_id=${scenarioId}`).then((r) => parse<WinSheet>(r));
 }
 
 export function setHold(scenarioId: string, orderId: string, held: boolean): Promise<{ held: string[] }> {
-  return fetch(apiUrl("/api/holds"), {
+  return apiFetch("/api/holds", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ scenario_id: scenarioId, order_id: orderId, held }),
@@ -133,7 +157,7 @@ export function setHold(scenarioId: string, orderId: string, held: boolean): Pro
 }
 
 export function clearHolds(scenarioId: string): Promise<{ held: string[] }> {
-  return fetch(apiUrl(`/api/holds/${scenarioId}`), { method: "DELETE" }).then((r) =>
+  return apiFetch(`/api/holds/${scenarioId}`, { method: "DELETE" }).then((r) =>
     parse<{ held: string[] }>(r),
   );
 }
@@ -153,7 +177,7 @@ export function fetchHistory(scenarioId: string): Promise<{
     created_at: string;
   }[];
 }> {
-  return fetch(apiUrl(`/api/history?scenario_id=${scenarioId}&limit=8`)).then((r) =>
+  return apiFetch(`/api/history?scenario_id=${scenarioId}&limit=8`).then((r) =>
     parse<{
       items: {
         id: number;

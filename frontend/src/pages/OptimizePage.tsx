@@ -3,6 +3,7 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../firebase/AuthProvider";
 import {
   mergeConnection,
+  useRealtimeDeliveries,
   useRealtimeDrivers,
   useRealtimeOptimizationRuns,
   useRealtimeOrders,
@@ -20,23 +21,98 @@ function metric(v: unknown): string | number {
   return v as string | number;
 }
 
+function friendlyApiError(raw: string): string {
+  if (
+    raw.includes("NOT_FOUND") ||
+    raw.includes("API unavailable") ||
+    raw.includes("Failed to fetch") ||
+    raw.includes("NetworkError") ||
+    /404/.test(raw)
+  ) {
+    return "API offline. Optimize needs the FastAPI backend. Set VITE_API_BASE_URL to your deployed API URL.";
+  }
+  return raw;
+}
+
+type OptimizeWorkItem = {
+  id: string;
+  order_id: string;
+  lat?: number;
+  lon?: number;
+  demandKg?: number;
+  timeWindowStart?: string;
+  timeWindowEnd?: string;
+  serviceDurationMinutes?: number;
+  priority?: string | number;
+  customerName?: string;
+  destination?: string;
+};
+
 export function OptimizePage() {
   const { profile, firebaseUser, getIdToken, can } = useAuth();
   const orgId = profile?.organizationId;
   const ordersQ = useRealtimeOrders(orgId);
+  const deliveriesQ = useRealtimeDeliveries(orgId);
   const vehiclesQ = useRealtimeVehicles(orgId);
   const driversQ = useRealtimeDrivers(orgId);
   const runsQ = useRealtimeOptimizationRuns(orgId);
-  const connection = mergeConnection(ordersQ.connection, vehiclesQ.connection, runsQ.connection);
+  const connection = mergeConnection(
+    ordersQ.connection,
+    vehiclesQ.connection,
+    deliveriesQ.connection,
+    runsQ.connection,
+  );
   const { show, toastEl } = useToast();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Record<string, any> | null>(null);
   const [optError, setOptError] = useState<string | null>(null);
 
-  const openOrders = useMemo(
-    () => ordersQ.data.filter((o) => !["COMPLETED", "CANCELLED", "FAILED"].includes(String(o.status))),
-    [ordersQ.data],
-  );
+  const openOrders = useMemo((): OptimizeWorkItem[] => {
+    const fromOrders = ordersQ.data
+      .filter((o) => !["COMPLETED", "CANCELLED", "FAILED"].includes(String(o.status)))
+      .map((o) => ({
+        id: o.id,
+        order_id: o.id,
+        lat: o.latitude,
+        lon: o.longitude,
+        demandKg: o.demandKg,
+        timeWindowStart: o.timeWindowStart,
+        timeWindowEnd: o.timeWindowEnd,
+        serviceDurationMinutes: o.serviceDurationMinutes ?? 15,
+        priority: o.priority,
+        customerName: o.customerName,
+        destination: o.destination ?? o.address,
+      }));
+
+    const knownIds = new Set(fromOrders.map((o) => o.id));
+    // Also index all order docs so we don't synthesize when an order exists but is closed.
+    const allOrderIds = new Set(ordersQ.data.map((o) => o.id));
+
+    const fromDeliveries: OptimizeWorkItem[] = [];
+    for (const d of deliveriesQ.data) {
+      if (["DELIVERED", "FAILED"].includes(String(d.status))) continue;
+      if (!d.orderId || knownIds.has(d.orderId) || allOrderIds.has(d.orderId)) continue;
+      const lat = d.lastLocation?.lat;
+      const lon = d.lastLocation?.lon;
+      fromDeliveries.push({
+        id: d.orderId,
+        order_id: d.orderId,
+        lat,
+        lon,
+        demandKg: 10,
+        timeWindowStart: d.windowStart,
+        timeWindowEnd: d.windowEnd,
+        serviceDurationMinutes: 15,
+        priority: d.priority,
+        customerName: d.customerName,
+        destination: d.destination,
+      });
+      knownIds.add(d.orderId);
+    }
+
+    return [...fromOrders, ...fromDeliveries];
+  }, [ordersQ.data, deliveriesQ.data]);
+
   const availableVehicles = useMemo(
     () =>
       vehiclesQ.data.filter(
@@ -46,6 +122,7 @@ export function OptimizePage() {
   );
 
   async function runOptimize() {
+    if (busy) return;
     if (!can("run_optimization") && !can("manage_orders")) {
       show("Not authorized", "err");
       return;
@@ -59,16 +136,16 @@ export function OptimizePage() {
         organization_id: orgId,
         orders: openOrders.map((o) => ({
           id: o.id,
-          order_id: o.id,
-          lat: o.latitude,
-          lon: o.longitude,
-          demandKg: o.demandKg,
+          order_id: o.order_id,
+          lat: o.lat,
+          lon: o.lon,
+          demandKg: o.demandKg ?? 10,
           timeWindowStart: o.timeWindowStart,
           timeWindowEnd: o.timeWindowEnd,
           serviceDurationMinutes: o.serviceDurationMinutes ?? 15,
           priority: o.priority,
           customerName: o.customerName,
-          destination: o.destination ?? o.address,
+          destination: o.destination,
         })),
         vehicles: availableVehicles.map((v) => {
           const driver = driversQ.data.find((d) => d.id === (v.driverId ?? v.assignedDriverId));
@@ -92,8 +169,20 @@ export function OptimizePage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(typeof body.detail === "string" ? body.detail : res.statusText);
+        const text = await res.text().catch(() => "");
+        if (res.status === 404 || text.includes("NOT_FOUND")) {
+          throw new Error(
+            "API offline. Optimize needs the FastAPI backend. Set VITE_API_BASE_URL to your deployed API URL.",
+          );
+        }
+        let detail = res.statusText;
+        try {
+          const body = JSON.parse(text) as { detail?: string };
+          if (body.detail) detail = body.detail;
+        } catch {
+          if (text) detail = text.slice(0, 200);
+        }
+        throw new Error(detail);
       }
       const data = await res.json();
       setResult(data);
@@ -117,9 +206,9 @@ export function OptimizePage() {
           createdBy: firebaseUser.uid,
         });
       }
-      show("Optimization complete — result written to Firestore");
+      show("Optimization complete. Result written to Firestore");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = friendlyApiError(e instanceof Error ? e.message : String(e));
       setOptError(msg);
       show(msg, "err");
     } finally {
@@ -128,6 +217,7 @@ export function OptimizePage() {
   }
 
   async function applyPlan() {
+    if (busy) return;
     if (!result?.optimize || !firebaseUser || !profile || !orgId) return;
     setBusy(true);
     try {
@@ -144,7 +234,7 @@ export function OptimizePage() {
           await assignOrderDelivery({ actor, order, driver, vehicle });
         }
       }
-      show("Plan applied — deliveries assigned via Firestore");
+      show("Plan applied. Deliveries assigned via Firestore");
     } catch (e) {
       show(e instanceof Error ? e.message : String(e), "err");
     } finally {
@@ -157,13 +247,13 @@ export function OptimizePage() {
   return (
     <OpsPageShell
       title="Optimize Deliveries"
-      subtitle="Live Firestore orders/vehicles → existing OR-Tools (hard constraints) + ML risk (advisory)."
+      subtitle="Live Firestore orders and vehicles flow into OR-Tools hard constraints with ML risk used only as advisory context."
       connection={connection}
       actions={
         <button
           type="button"
           disabled={busy || openOrders.length === 0 || availableVehicles.length === 0}
-          className="bg-coral px-4 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
+          className="rounded-xl bg-coral px-4 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
           onClick={() => void runOptimize()}
         >
           {busy ? "Optimization running…" : "Optimize with Nexus AI"}
@@ -171,7 +261,26 @@ export function OptimizePage() {
       }
     >
       {toastEl}
-      {(ordersQ.loading || vehiclesQ.loading) && (
+      <section className="mt-6 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-2xl border border-ink bg-ink p-5 text-snow">
+          <p className="font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-snow/70">Fastest path</p>
+          <ol className="mt-3 space-y-3 font-sans text-[14px] leading-6 text-snow/80">
+            <li>1. Confirm open work and vehicle availability.</li>
+            <li>2. Run optimization once.</li>
+            <li>3. Compare the result, then approve if it is feasible.</li>
+          </ol>
+        </div>
+        <div className="rounded-2xl border border-hairline bg-snow p-5">
+          <p className="font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-mute">Readiness</p>
+          <p className="mt-2 font-sans text-[18px] font-semibold text-ink">
+            {openOrders.length > 0 && availableVehicles.length > 0 ? "Ready to optimize" : "Needs input before optimize"}
+          </p>
+          <p className="mt-2 font-sans text-[13px] leading-6 text-mute">
+            Orders can come from live order documents or from active delivery records when the order collection is incomplete.
+          </p>
+        </div>
+      </section>
+      {(ordersQ.loading || vehiclesQ.loading || deliveriesQ.loading) && (
         <p className="mt-4 font-sans text-[13px] text-mute">Loading live fleet and orders…</p>
       )}
       {optError && (
@@ -181,7 +290,7 @@ export function OptimizePage() {
       )}
       {(connection === "offline" || connection === "error") && (
         <p className="mt-4 border border-hairline bg-snow px-3 py-2 font-sans text-[13px] text-mute">
-          Connection issue — unable to synchronize. Do not treat inputs as live.
+          Connection issue. Unable to synchronize. Do not treat inputs as live.
         </p>
       )}
       <MetricGrid
@@ -193,34 +302,46 @@ export function OptimizePage() {
         ]}
       />
 
-      {openOrders.length === 0 && !ordersQ.loading && (
+      {openOrders.length === 0 && !ordersQ.loading && !deliveriesQ.loading && (
         <p className="mt-4 font-sans text-[13px] text-mute">
-          No open orders — generate a demo scenario from Scenario Studio first.
+          No open orders. Generate a demo scenario from Scenario Studio first.
         </p>
       )}
 
       <section className="mt-6 border border-hairline bg-snow p-4 font-sans text-[13px] text-mute">
-        <p className="font-semibold text-ink">Constraints (hard)</p>
-        <ul className="mt-2 list-disc pl-5">
-          <li>Vehicle capacity</li>
-          <li>Delivery time windows</li>
-          <li>Driver shift windows</li>
-          <li>Vehicle availability (no breakdown/maintenance)</li>
-        </ul>
-        <p className="mt-3">ML never overrides feasibility — triage only influences drop preference among normals.</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="font-semibold text-ink">Constraints (hard)</p>
+            <ul className="mt-2 list-disc pl-5">
+              <li>Vehicle capacity</li>
+              <li>Delivery time windows</li>
+              <li>Driver shift windows</li>
+              <li>Vehicle availability (no breakdown/maintenance)</li>
+            </ul>
+          </div>
+          <div className="min-w-[240px] rounded-xl bg-paper px-4 py-3">
+            <p className="font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-mute">ML advisory</p>
+            <p className="mt-2 font-sans text-[13px] leading-6 text-mute">
+              Risk never overrides feasibility. It only helps rank borderline work once hard constraints are satisfied.
+            </p>
+          </div>
+        </div>
       </section>
 
       {result && (
         <section className="mt-8 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-sans text-[18px] font-semibold">Baseline vs Nexus AI</h2>
-            <span className="font-mono text-[12px] text-mute">
+            <div>
+              <h2 className="font-sans text-[20px] font-semibold">Baseline vs Nexus AI</h2>
+              <p className="mt-1 font-sans text-[13px] text-mute">Review the summary first, then inspect route-level details below.</p>
+            </div>
+            <span className="rounded-full border border-hairline px-2 py-1 font-mono text-[12px] text-mute">
               {result.feasible ? "FEASIBLE" : "INFEASIBLE"} · {result.partial ? "PARTIALLY FEASIBLE" : "FULL"}
             </span>
             <button
               type="button"
               disabled={busy}
-              className="border border-ink px-3 py-2 font-sans text-[13px] font-semibold"
+              className="rounded-xl border border-ink px-3 py-2 font-sans text-[13px] font-semibold"
               onClick={() => void applyPlan()}
             >
               Approve plan
@@ -240,7 +361,7 @@ export function OptimizePage() {
             ]}
           />
 
-          <div className="overflow-x-auto border border-hairline bg-snow">
+          <div className="overflow-x-auto rounded-2xl border border-hairline bg-snow">
             <table className="min-w-full font-mono text-[12px]">
               <thead className="border-b border-hairline bg-paper text-mute">
                 <tr>
@@ -264,7 +385,7 @@ export function OptimizePage() {
             </table>
           </div>
 
-          <div className="border border-hairline bg-snow p-4">
+          <div className="rounded-2xl border border-hairline bg-snow p-4">
             <p className="sys">Risk / explainability</p>
             <ul className="mt-2 space-y-1 font-sans text-[13px] text-mute">
               {(result.explanations ?? []).length === 0 && <li>N/A</li>}
@@ -282,18 +403,28 @@ export function OptimizePage() {
 
           <div className="grid gap-3 md:grid-cols-2">
             {(result.optimize?.routes ?? []).map((route: any) => (
-              <div key={route.vehicle_id} className="border border-hairline bg-snow p-3 font-mono text-[12px]">
-                <p className="font-semibold">
-                  {route.vehicle_id} · {route.driver || "driver"} · load {route.load}/{route.capacity}
-                </p>
+              <div key={route.vehicle_id} className="rounded-2xl border border-hairline bg-snow p-4 font-mono text-[12px]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-ink">{route.vehicle_id}</p>
+                    <p className="mt-1 font-sans text-[13px] text-mute">{route.driver || "Driver pending"}</p>
+                  </div>
+                  <span className="rounded-full bg-paper px-2 py-1 text-[11px] text-mute">
+                    load {route.load}/{route.capacity}
+                  </span>
+                </div>
+                <p className="mt-3 font-sans text-[13px] font-semibold text-ink">Stop sequence</p>
                 <ol className="mt-2 list-decimal pl-4">
                   {(route.stops ?? []).map((s: any) => (
-                    <li key={s.order_id}>
+                    <li key={s.order_id} className="py-0.5">
                       {s.order_id} · ETA {s.eta_min != null ? `${s.eta_min}m` : "N/A"} · risk{" "}
                       {s.risk?.p_late != null ? s.risk.p_late : "N/A"}
                     </li>
                   ))}
                 </ol>
+                {!(route.stops ?? []).length && (
+                  <p className="mt-2 font-sans text-[13px] text-mute">No assigned stops in this route.</p>
+                )}
               </div>
             ))}
           </div>
@@ -305,7 +436,7 @@ export function OptimizePage() {
         <ul className="mt-3 space-y-2">
           {runsQ.data.slice(0, 8).map((run: any) => (
             <li key={run.id} className="border border-hairline bg-snow px-3 py-2 font-mono text-[12px]">
-              {run.mode ?? "run"} · {run.source ?? "—"} · feasible={String(run.feasible)} ·{" "}
+              {run.mode ?? "run"} · {run.source ?? "N/A"} · feasible={String(run.feasible)} ·{" "}
               {formatLastSeen(run.createdAt)}
             </li>
           ))}

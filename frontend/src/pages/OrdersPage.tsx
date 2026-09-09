@@ -15,7 +15,7 @@ import {
   assignOrderDelivery,
   cancelOrder,
   createOrder,
-  generateSyntheticOrder,
+  generateSyntheticOrderAuto,
 } from "../services/firestore/entityCrud";
 import { ORDER_PRIORITIES, ORDER_STATUSES } from "../lib/opsEnums";
 import type { OpsOrder } from "../lib/opsTypes";
@@ -56,7 +56,7 @@ export function OrdersPage({ readOnly = false }: { readOnly?: boolean }) {
     setBusy(true);
     try {
       await fn();
-      show(`${label} — Firestore updated`);
+      show(`${label} · Firestore updated`);
     } catch (e) {
       show(e instanceof Error ? e.message : String(e), "err");
     } finally {
@@ -77,18 +77,15 @@ export function OrdersPage({ readOnly = false }: { readOnly?: boolean }) {
             </button>
             <button
               type="button"
-              disabled={busy || customersQ.data.length === 0}
+              disabled={busy}
               className="bg-coral px-3 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
-              onClick={() => {
-                const customer = customersQ.data.find((c) => c.active !== false) ?? customersQ.data[0];
-                if (!customer) {
-                  show("Create a customer first", "err");
-                  return;
-                }
-                void run("Synthetic order", () => generateSyntheticOrder(actor, customer).then(() => undefined));
-              }}
+              onClick={() =>
+                void run("Synthetic order", () =>
+                  generateSyntheticOrderAuto(actor, customersQ.data).then(() => undefined),
+                )
+              }
             >
-              Generate Synthetic
+              {busy ? "Generating…" : "Generate Synthetic"}
             </button>
           </>
         ) : null
@@ -263,7 +260,7 @@ export function OrdersPage({ readOnly = false }: { readOnly?: boolean }) {
                       <button
                         type="button"
                         className="border border-coral px-2 py-1 text-coral"
-                        disabled={busy}
+                        disabled={busy || o.status === "CANCELLED" || o.status === "COMPLETED"}
                         onClick={() => {
                           if (!window.confirm("Cancel order?")) return;
                           void run("Cancel", () => cancelOrder(actor, o));

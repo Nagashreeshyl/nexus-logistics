@@ -98,14 +98,14 @@ export function AppShell() {
         ),
       )}
       <NavLink
-        to="/lab"
+        to="/optimizer"
         className={({ isActive }) =>
           `block px-3 py-2 font-sans text-[13px] font-semibold ${
             isActive ? "bg-coral/30 text-ink" : "text-mute hover:text-ink"
           }`
         }
       >
-        Optimizer Lab (V1)
+        Optimizer Lab
       </NavLink>
     </div>
   );
@@ -113,31 +113,38 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh bg-paper text-ink">
       {/* Desktop sidebar */}
-      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-hairline bg-snow md:flex">
-        <div className="flex items-center gap-2 border-b border-hairline px-4 py-4">
+      <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-snow md:flex">
+        <div className="flex items-center gap-3 border-b border-hairline px-5 py-5">
           <BrandLogo className="h-8 w-8" />
           <div>
-            <p className="font-sans text-[14px] font-semibold">Nexus Logistics</p>
-            <p className="font-mono text-[10px] text-mute">Operations platform</p>
+            <p className="font-sans text-[15px] font-semibold">Nexus Logistics</p>
+            <p className="font-sans text-[12px] text-mute">Legacy ops (hidden from demo nav)</p>
           </div>
         </div>
-        <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+        <div className="border-b border-hairline px-3 py-2">
+          <NavLink to="/" className="block px-2 py-2 font-sans text-[12px] font-semibold text-coral">
+            ← Hackathon home
+          </NavLink>
+          <NavLink to="/optimizer" className="block px-2 py-2 font-sans text-[12px] font-semibold text-mute hover:text-ink">
+            Optimizer Lab
+          </NavLink>
+        </div>
+        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
           {workspaceList}
           {roleNav}
         </div>
-        <div className="border-t border-hairline px-4 py-3 font-mono text-[10px] text-mute">
-          {profile?.email}
-          <br />
-          UID {firebaseUser?.uid?.slice(0, 8)}…
+        <div className="border-t border-hairline px-5 py-4">
+          <p className="font-sans text-[12px] font-medium text-ink">{profile?.email}</p>
+          <p className="mt-1 font-mono text-[11px] text-mute">UID {firebaseUser?.uid?.slice(0, 8)}…</p>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-hairline bg-snow/95 backdrop-blur">
-          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-4">
             <button
               type="button"
-              className="border border-hairline px-3 py-2 font-sans text-[13px] font-semibold md:hidden"
+              className="rounded-xl border border-hairline px-3 py-2 font-sans text-[13px] font-semibold md:hidden"
               onClick={() => setMobileNav((v) => !v)}
               aria-expanded={mobileNav}
             >
@@ -147,15 +154,15 @@ export function AppShell() {
               {identity ? (
                 <>
                   <p className="sys text-coral">{identity.eyebrow}</p>
-                  <p className="truncate font-sans text-[15px] font-semibold">{identity.description}</p>
+                  <p className="truncate font-sans text-[16px] font-semibold">{identity.description}</p>
                 </>
               ) : (
                 <p className="font-sans text-[14px] font-semibold">Nexus Logistics</p>
               )}
-              <p className="truncate font-mono text-[11px] text-mute">
+              <p className="truncate font-sans text-[12px] text-mute">
                 {profile?.email ?? "…"}
                 {profile?.lastSeenAt ? (
-                  <span className="ml-2">· Last active {formatLastSeen(profile.lastSeenAt)}</span>
+                  <span className="ml-2">Last active {formatLastSeen(profile.lastSeenAt)}</span>
                 ) : null}
               </p>
             </div>
@@ -166,13 +173,13 @@ export function AppShell() {
             <div className="relative">
               <button
                 type="button"
-                className="border border-hairline px-3 py-2 font-sans text-[13px] font-semibold"
+                className="rounded-xl border border-hairline px-3 py-2 font-sans text-[13px] font-semibold"
                 onClick={() => setOpenNotifs((v) => !v)}
               >
                 Alerts{unread ? ` (${unread})` : ""}
               </button>
               {openNotifs && (
-                <div className="absolute right-0 z-50 mt-1 w-80 border border-ink bg-snow shadow-card">
+                <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-ink bg-snow shadow-card">
                   <p className="border-b border-hairline px-3 py-2 font-sans text-[12px] font-semibold">
                     In-app notifications
                   </p>
@@ -199,7 +206,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => void logout()}
-              className="border border-hairline px-3 py-2 font-sans text-[13px] font-semibold hover:border-ink"
+              className="rounded-xl border border-hairline px-3 py-2 font-sans text-[13px] font-semibold hover:border-ink"
             >
               Log out
             </button>

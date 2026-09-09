@@ -1,36 +1,38 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HackathonShell } from "./components/HackathonShell";
 import { AppShell } from "./components/AppShell";
 import { RequireAuth, RequireRole } from "./components/RequireAuth";
-import { AuthProvider, useAuth } from "./firebase/AuthProvider";
+import { AuthProvider } from "./firebase/AuthProvider";
+import { LandingPage } from "./pages/LandingPage";
+import { PresentationPage } from "./pages/PresentationPage";
+import { OptimizerLabPage } from "./pages/OptimizerLabPage";
 import { LoginPage } from "./pages/LoginPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { AdminHome, AnalystHome, DispatcherHome, DriverHome } from "./pages/RoleHomes";
 import { Console } from "./pages/Console";
-import { getRoleHomeRoute, pickActiveRole } from "./lib/roles";
 
-function LabPage() {
-  return <Console onBack={() => window.history.back()} />;
-}
-
-function HomeRedirect() {
-  const { profile } = useAuth();
-  if (!profile || profile.roles.length === 0) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-  return <Navigate to={getRoleHomeRoute(pickActiveRole(profile.roles, profile.activeRole))} replace />;
-}
-
+/**
+ * Primary UX (hackathon): / · /presentation · /optimizer
+ * Legacy ops workspaces kept for deep links / recovery — not in primary nav.
+ * Dense Lab at /lab (debug); prefer /optimizer for demos.
+ */
 export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route element={<HackathonShell />}>
+            <Route index element={<LandingPage />} />
+            <Route path="presentation" element={<PresentationPage />} />
+            <Route path="optimizer" element={<OptimizerLabPage />} />
+          </Route>
+
+          <Route path="/lab" element={<Console onBack={() => window.history.back()} />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/lab" element={<LabPage />} />
+
           <Route element={<RequireAuth />}>
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
             <Route element={<AppShell />}>
-              <Route index element={<HomeRedirect />} />
               <Route element={<RequireRole role="admin" />}>
                 <Route path="/admin/*" element={<AdminHome />} />
               </Route>
@@ -45,7 +47,8 @@ export function App() {
               </Route>
             </Route>
           </Route>
-          <Route path="*" element={<Navigate to="/login" replace />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

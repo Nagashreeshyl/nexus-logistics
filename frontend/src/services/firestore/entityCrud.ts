@@ -5,6 +5,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -550,25 +551,70 @@ export async function generateSyntheticOrder(actor: Actor, customer: OpsCustomer
   });
 }
 
+/** Creates a synthetic customer when none are available, then a synthetic order. */
+export async function generateSyntheticOrderAuto(
+  actor: Actor,
+  existingCustomers: OpsCustomer[] = [],
+  seed?: { v: number },
+): Promise<string> {
+  const s = seed ?? { v: Date.now() >>> 0 };
+  let customer = existingCustomers.find((c) => c.active !== false) ?? existingCustomers[0];
+  if (!customer) {
+    const customerId = await generateSyntheticCustomer(actor, s);
+    const snap = await getDoc(doc(dbOrThrow(), "customers", customerId));
+    if (!snap.exists()) {
+      throw new Error("Synthetic customer was created but could not be loaded");
+    }
+    customer = { id: snap.id, ...(snap.data() as Omit<OpsCustomer, "id">) };
+  }
+  return generateSyntheticOrder(actor, customer, s);
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = Math.min(Math.max(1, concurrency), Math.max(1, items.length));
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
 export async function generateOperationalScenario(
   actor: Actor,
   counts: { vehicles: number; drivers: number; customers: number; orders: number; seed?: number },
   linkUserId?: string | null,
+  onProgress?: (msg: string) => void,
 ): Promise<{ vehicleIds: string[]; driverIds: string[]; customerIds: string[]; orderIds: string[] }> {
   const seed = { v: (counts.seed ?? 20260909) >>> 0 };
   const vehicleIds: string[] = [];
   const driverIds: string[] = [];
   const customerIds: string[] = [];
   const orderIds: string[] = [];
+  const progress = (msg: string) => onProgress?.(msg);
 
+  progress(`Generating fleet (${counts.vehicles})…`);
   for (let i = 0; i < counts.vehicles; i++) vehicleIds.push(await generateSyntheticVehicle(actor, seed));
+
+  progress(`Generating drivers (${counts.drivers})…`);
   for (let i = 0; i < counts.drivers; i++) {
     driverIds.push(await generateSyntheticDriver(actor, i === 0 ? linkUserId ?? null : null, seed));
   }
+
+  progress(`Generating customers (${counts.customers})…`);
   for (let i = 0; i < counts.customers; i++) customerIds.push(await generateSyntheticCustomer(actor, seed));
 
   // Pair first N drivers/vehicles
   const pairN = Math.min(vehicleIds.length, driverIds.length);
+  progress(`Pairing ${pairN} drivers ↔ vehicles…`);
   for (let i = 0; i < pairN; i++) {
     await updateDoc(doc(dbOrThrow(), "drivers", driverIds[i]), {
       assignedVehicleId: vehicleIds[i],
@@ -583,44 +629,57 @@ export async function generateOperationalScenario(
     });
   }
 
-  for (let i = 0; i < counts.orders; i++) {
+  progress(`Generating orders (${counts.orders})…`);
+  // Pre-draw coords with the LCG so parallel workers stay deterministic.
+  const orderSpecs = Array.from({ length: counts.orders }, (_, i) => {
     const cid = customerIds[i % customerIds.length];
-    const lat = 12.95 + (rnd(60, seed) / 1000);
-    const lon = 77.58 + (rnd(60, seed) / 1000);
-    orderIds.push(
-      await createOrder(actor, {
-        customer: {
-          id: cid,
-          organizationId: actor.organizationId,
-          name: `Scenario Customer ${i + 1}`,
-          address: `${20 + i} Scenario Rd, Bengaluru`,
-          latitude: lat,
-          longitude: lon,
-          active: true,
-          preferredDeliveryWindowStart: "09:00",
-          preferredDeliveryWindowEnd: "17:00",
-        },
-        customerId: cid,
-        customerName: `Scenario Customer ${i + 1}`,
-        destination: `${20 + i} Scenario Rd, Bengaluru`,
-        latitude: lat,
-        longitude: lon,
-        demandKg: 8 + (i % 20),
-        volume: 1,
-        priority: ORDER_PRIORITIES[i % ORDER_PRIORITIES.length],
-        timeWindowStart: "09:00",
-        timeWindowEnd: "17:00",
-        serviceDurationMinutes: 15,
-        requestedDate: new Date().toISOString().slice(0, 10),
-        synthetic: true,
-      }),
-    );
-  }
+    const lat = 12.95 + rnd(60, seed) / 1000;
+    const lon = 77.58 + rnd(60, seed) / 1000;
+    return { i, cid, lat, lon };
+  });
 
-  await audit(actor.organizationId, actor.uid, actor.email, "SEED_OPERATIONAL_SCENARIO", "scenario", "ops-seed", {
+  let created = 0;
+  const createdIds = await mapPool(orderSpecs, 4, async (spec) => {
+    const id = await createOrder(actor, {
+      customer: {
+        id: spec.cid,
+        organizationId: actor.organizationId,
+        name: `Scenario Customer ${spec.i + 1}`,
+        address: `${20 + spec.i} Scenario Rd, Bengaluru`,
+        latitude: spec.lat,
+        longitude: spec.lon,
+        active: true,
+        preferredDeliveryWindowStart: "09:00",
+        preferredDeliveryWindowEnd: "17:00",
+      },
+      customerId: spec.cid,
+      customerName: `Scenario Customer ${spec.i + 1}`,
+      destination: `${20 + spec.i} Scenario Rd, Bengaluru`,
+      latitude: spec.lat,
+      longitude: spec.lon,
+      demandKg: 8 + (spec.i % 20),
+      volume: 1,
+      priority: ORDER_PRIORITIES[spec.i % ORDER_PRIORITIES.length],
+      timeWindowStart: "09:00",
+      timeWindowEnd: "17:00",
+      serviceDurationMinutes: 15,
+      requestedDate: new Date().toISOString().slice(0, 10),
+      synthetic: true,
+    });
+    created += 1;
+    if (created === 1 || created % 4 === 0 || created === counts.orders) {
+      progress(`Orders ${created}/${counts.orders}…`);
+    }
+    return id;
+  });
+  orderIds.push(...createdIds);
+
+  // Non-blocking audit — do not await
+  audit(actor.organizationId, actor.uid, actor.email, "SEED_OPERATIONAL_SCENARIO", "scenario", "ops-seed", {
     ...counts,
     synthetic: true,
   });
 
+  progress("Scenario publish complete");
   return { vehicleIds, driverIds, customerIds, orderIds };
 }

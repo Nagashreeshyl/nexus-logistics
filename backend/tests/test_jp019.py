@@ -195,3 +195,49 @@ def test_ops_admin_ping_requires_auth():
 def test_ops_active_role_requires_auth():
     r = client.post("/api/ops/me/active-role", json={"role": "driver"})
     assert r.status_code == 401
+
+
+def test_lab_synthetic_generates_varying_scenarios():
+    a = client.post("/api/lab/synthetic?seed=111")
+    b = client.post("/api/lab/synthetic?seed=222")
+    assert a.status_code == 200 and b.status_code == 200
+    pa, pb = a.json(), b.json()
+    assert pa["summary"]["orders"] >= 12
+    assert pa["summary"]["vehicles"] >= 3
+    assert pa["scenario_id"] != pb["scenario_id"] or pa["summary"] != pb["summary"]
+    assert all("lat" in o and "lon" in o and "demand" in o for o in pa["orders"])
+
+
+def test_lab_run_real_optimizer():
+    syn = client.post("/api/lab/synthetic?seed=42")
+    assert syn.status_code == 200
+    payload = syn.json()
+    run = client.post(
+        "/api/lab/run",
+        json={
+            "scenario_id": payload["scenario_id"],
+            "orders": payload["orders"],
+            "vehicles": payload["vehicles"],
+        },
+    )
+    assert run.status_code == 200
+    body = run.json()
+    assert "baseline" in body and "optimize" in body
+    assert "metrics" in body["optimize"]
+    # Hard capacity on assigned routes (OR-Tools); allow deferred orders when partial
+    for route in body["optimize"]["routes"]:
+        assert route["load"] <= route["capacity"]
+        assert route["capacity_breach"] is False
+    # Reoptimize excluding one vehicle
+    vid = payload["vehicles"][0]["vehicle_id"]
+    re = client.post(
+        "/api/lab/run",
+        json={
+            "scenario_id": payload["scenario_id"],
+            "orders": payload["orders"],
+            "vehicles": payload["vehicles"],
+            "exclude_vehicle_ids": [vid],
+        },
+    )
+    assert re.status_code == 200
+    assert vid in re.json()["excluded_vehicles"]

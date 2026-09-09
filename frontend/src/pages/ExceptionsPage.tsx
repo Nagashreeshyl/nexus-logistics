@@ -130,18 +130,36 @@ export function ExceptionsPage() {
   }
 
   async function markBreakdown(vehicleId: string) {
-    if (!canWrite) return;
+    if (!canWrite || busy) return;
     setBusy(true);
     try {
       await updateVehicle(actor, vehicleId, { status: "BREAKDOWN" });
+      const vehicle = vehiclesQ.data.find((v) => v.id === vehicleId);
       const affected = deliveriesQ.data.filter(
         (d) => d.vehicleId === vehicleId && !["DELIVERED", "FAILED"].includes(d.status),
       );
+      const affectedOrderIds = affected.map((d) => d.orderId).filter(Boolean);
+      const fb = getFirebase();
+      if (fb.configured && orgId && firebaseUser) {
+        await addDoc(collection(fb.db, "exceptions"), {
+          organizationId: orgId,
+          type: "VEHICLE_BREAKDOWN",
+          severity: "HIGH",
+          status: "open",
+          vehicleId,
+          message: `Vehicle ${vehicle?.registrationNumber ?? vehicleId} marked BREAKDOWN`,
+          affectedOrderIds,
+          synthetic: vehicle?.synthetic === true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: firebaseUser.uid,
+        });
+      }
       show(`Breakdown recorded · ${affected.length} deliveries affected`);
       setReopt({
         kind: "breakdown-pending-reopt",
         brokenVehicleId: vehicleId,
-        affectedOrderIds: affected.map((d) => d.orderId),
+        affectedOrderIds,
         note: "Vehicle marked BREAKDOWN in Firestore. Click Reoptimize to compute a new feasible plan excluding this vehicle.",
       });
     } catch (e) {
@@ -152,6 +170,7 @@ export function ExceptionsPage() {
   }
 
   async function reoptimize() {
+    if (busy) return;
     if (!reopt?.brokenVehicleId || !canWrite) return;
     setBusy(true);
     try {
@@ -167,7 +186,7 @@ export function ExceptionsPage() {
         partial: data.partial,
         note: "Live OR-Tools reoptimization excluding the broken vehicle. Review Before/After, then Approve plan to write assignments.",
       });
-      show("Reoptimization complete — review Before/After");
+      show("Reoptimization complete. Review before and after");
     } catch (e) {
       show(e instanceof Error ? e.message : String(e), "err");
     } finally {
@@ -176,6 +195,7 @@ export function ExceptionsPage() {
   }
 
   async function approvePlan() {
+    if (busy) return;
     if (!reopt?.optimize || !firebaseUser || !profile || !orgId) return;
     setBusy(true);
     try {
@@ -191,7 +211,7 @@ export function ExceptionsPage() {
           await assignOrderDelivery({ actor, order, driver, vehicle });
         }
       }
-      show("Plan approved — assignments written to Firestore");
+      show("Plan approved. Assignments written to Firestore");
     } catch (e) {
       show(e instanceof Error ? e.message : String(e), "err");
     } finally {
@@ -202,7 +222,7 @@ export function ExceptionsPage() {
   return (
     <OpsPageShell
       title="Exception Center"
-      subtitle="Disruptions create exceptions. Reoptimization uses OR-Tools hard constraints — never LLM routing."
+      subtitle="Disruptions create exceptions. Reoptimization uses OR-Tools hard constraints and never LLM routing."
       connection={connection}
       actions={
         reopt?.brokenVehicleId && canWrite ? (
@@ -218,6 +238,25 @@ export function ExceptionsPage() {
       }
     >
       {toastEl}
+      <section className="mt-6 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-2xl border border-ink bg-ink p-5 text-snow">
+          <p className="font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-snow/70">Recovery flow</p>
+          <ol className="mt-3 space-y-3 font-sans text-[14px] leading-6 text-snow/80">
+            <li>1. Mark the blocked vehicle or delivery issue.</li>
+            <li>2. Review the proposed before / after plan.</li>
+            <li>3. Approve only after the impact looks feasible.</li>
+          </ol>
+        </div>
+        <div className="rounded-2xl border border-hairline bg-snow p-5">
+          <p className="font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-mute">Current reoptimization</p>
+          <p className="mt-2 font-sans text-[18px] font-semibold text-ink">
+            {reopt?.brokenVehicleId ? `Vehicle ${reopt.brokenVehicleId.slice(0, 8)}` : "No active disruption selected"}
+          </p>
+          <p className="mt-2 font-sans text-[13px] leading-6 text-mute">
+            Use this page for exceptions only. Normal assignments should stay in Operations or Optimize.
+          </p>
+        </div>
+      </section>
 
       {exceptionsQ.loading && <p className="mt-4 font-sans text-[13px] text-mute">Loading exceptions…</p>}
       {exceptionsQ.error && (
@@ -225,12 +264,12 @@ export function ExceptionsPage() {
       )}
       {connection === "permission_denied" && (
         <p className="mt-4 border border-coral bg-snow px-3 py-2 font-sans text-[13px] text-coral">
-          Permission denied — unable to synchronize exceptions.
+          Permission denied. Unable to synchronize exceptions.
         </p>
       )}
       {(connection === "offline" || connection === "error") && (
         <p className="mt-4 border border-hairline bg-snow px-3 py-2 font-sans text-[13px] text-mute">
-          Connection issue — unable to synchronize. Do not treat this board as live.
+          Connection issue. Unable to synchronize. Do not treat this board as live.
         </p>
       )}
 
@@ -244,17 +283,22 @@ export function ExceptionsPage() {
       />
 
       <section className="mt-6">
-        <h2 className="font-sans text-[16px] font-semibold">Mark vehicle breakdown</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-sans text-[18px] font-semibold">Mark vehicle breakdown</h2>
+            <p className="mt-1 font-sans text-[13px] text-mute">Pick the vehicle that is blocked right now. This creates an exception record and prepares a reoptimization draft.</p>
+          </div>
+        </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {vehiclesQ.data.length === 0 && !vehiclesQ.loading && (
-            <p className="font-sans text-[13px] text-mute">No vehicles — generate a demo scenario first.</p>
+            <p className="font-sans text-[13px] text-mute">No vehicles. Generate a demo scenario first.</p>
           )}
           {vehiclesQ.data.map((v) => (
             <button
               key={v.id}
               type="button"
               disabled={busy || !canWrite || v.status === "BREAKDOWN"}
-              className="border border-hairline px-3 py-2 font-mono text-[12px] disabled:opacity-40"
+              className="rounded-xl border border-hairline px-3 py-2 font-mono text-[12px] disabled:opacity-40"
               onClick={() => void markBreakdown(v.id)}
             >
               {v.registrationNumber ?? v.id.slice(0, 6)} · {v.status}
@@ -263,7 +307,7 @@ export function ExceptionsPage() {
         </div>
       </section>
 
-      <div className="mt-6 overflow-x-auto border border-hairline bg-snow">
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-hairline bg-snow">
         <table className="min-w-full font-mono text-[12px]">
           <thead className="border-b border-hairline bg-paper text-mute">
             <tr>
@@ -280,8 +324,8 @@ export function ExceptionsPage() {
                 <td className="px-3 py-2 font-semibold text-coral">{ex.type}</td>
                 <td className="px-3 py-2">{ex.severity}</td>
                 <td className="max-w-[280px] px-3 py-2">{ex.message}</td>
-                <td className="px-3 py-2">{ex.vehicleId?.slice(0, 8) ?? "—"}</td>
-                <td className="px-3 py-2">{ex.orderId ?? "—"}</td>
+                <td className="px-3 py-2">{ex.vehicleId?.slice(0, 8) ?? "N/A"}</td>
+                <td className="px-3 py-2">{ex.orderId ?? "N/A"}</td>
                 <td className="px-3 py-2">
                   <StatusBadge status={String(ex.status)} />
                 </td>
@@ -302,12 +346,15 @@ export function ExceptionsPage() {
       {reopt && (
         <section className="mt-8 border border-hairline bg-snow p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-sans text-[16px] font-semibold">Before / After reoptimization</h2>
+            <div>
+              <h2 className="font-sans text-[18px] font-semibold">Before / after reoptimization</h2>
+              <p className="mt-1 font-sans text-[13px] text-mute">Check the tradeoffs before writing a new plan to Firestore.</p>
+            </div>
             {reopt.optimize && canWrite && (
               <button
                 type="button"
                 disabled={busy}
-                className="border border-ink px-4 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
+                className="rounded-xl border border-ink px-4 py-2 font-sans text-[13px] font-semibold disabled:opacity-40"
                 onClick={() => void approvePlan()}
               >
                 Approve plan
@@ -315,8 +362,10 @@ export function ExceptionsPage() {
             )}
           </div>
           <p className="mt-1 font-sans text-[13px] text-mute">{reopt.note}</p>
-          <p className="mt-2 font-mono text-[12px]">Broken: {reopt.brokenVehicleId}</p>
-          <p className="font-mono text-[12px]">Affected: {(reopt.affectedOrderIds ?? []).join(", ") || "none"}</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl bg-paper px-3 py-3 font-mono text-[12px]">Broken vehicle: {reopt.brokenVehicleId}</div>
+            <div className="rounded-xl bg-paper px-3 py-3 font-mono text-[12px]">Affected orders: {(reopt.affectedOrderIds ?? []).join(", ") || "none"}</div>
+          </div>
           {reopt.comparison ? (
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full font-mono text-[12px]">

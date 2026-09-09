@@ -78,9 +78,17 @@ export function ExportViewer({ kind, scenarioId, mode, onClose }: ExportViewerPr
     const url = kind === "csv" ? manifestUrl(scenarioId, mode) : geojsonUrl(scenarioId, mode);
     fetch(url)
       .then(async (r) => {
-        if (!r.ok) throw new Error(await r.text());
-        if (kind === "csv") return { csv: await r.text(), geo: null };
-        return { csv: "", geo: await r.json() };
+        const text = await r.text();
+        if (!r.ok || text.includes("NOT_FOUND")) {
+          if (r.status === 404 || text.includes("NOT_FOUND")) {
+            throw new Error(
+              "API offline — Map/Driver exports need the FastAPI backend (VITE_API_BASE_URL).",
+            );
+          }
+          throw new Error(text.slice(0, 200) || r.statusText || "Failed to load export");
+        }
+        if (kind === "csv") return { csv: text, geo: null };
+        return { csv: "", geo: JSON.parse(text) };
       })
       .then((payload) => {
         if (cancelled) return;
