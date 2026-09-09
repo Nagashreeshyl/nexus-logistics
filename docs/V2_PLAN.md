@@ -13,13 +13,13 @@ OR-Tools CVRPTW, baseline, risk ML, OSRM→haversine, Console as Optimizer Lab u
 | v2.2 | Firestore repos + schema types |
 | v2.3 | Auth + RBAC + role switcher + protected routes |
 | v2.4 | Realtime hooks |
-| v2.5 | Fleet / drivers / customers / orders + synthetic buttons |
-| v2.6 | Optimizer ↔ Firestore bridge |
-| v2.7–v2.8 | Driver map + delivery state machine |
-| v2.9 | Exceptions + reoptimization |
-| v2.10 | Full scenario generator |
-| v2.11 | Analytics + audit |
-| v2.12–13 | Tests + polish |
+| v2.5 | Fleet / drivers / customers / orders + synthetic buttons | **Implemented on v2** |
+| v2.6 | Optimizer ↔ Firestore bridge (`/api/ops/optimize-live`) | **Implemented on v2** |
+| v2.7–v2.8 | Driver map + delivery state machine | **Map + existing state machine on v2** |
+| v2.9 | Exceptions + reoptimization | **Exception center + reopt preview on v2** |
+| v2.10 | Full scenario generator | **Scenario Studio presets on v2** |
+| v2.11 | Analytics + audit | **Analyst dashboard + optimizationRuns on v2** |
+| v2.12–13 | Tests + polish | **docs/SECURITY, TESTING, DEMO_RUNBOOK** |
 
 ## Rule
 No hardcoded operational data. Firestore = SoR. Synthetic → same write path as real forms.

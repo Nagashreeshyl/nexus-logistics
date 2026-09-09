@@ -6,6 +6,22 @@ Build bible for the working demo. Visual tokens and screens live in [`DESIGN.md`
 
 ---
 
+## V2 operational control center (branch `v2`)
+
+```text
+Nexus Logistics
+  → Role workspaces (Admin / Dispatcher / Driver / Analyst)
+  → Live Firestore (SoR)
+  → OR-Tools CVRPTW (hard constraints)
+  → ML late-risk (advisory)
+  → Exception-driven reoptimization
+  → Analyst metrics + optimizationRuns audit
+```
+
+See `docs/DEMO_RUNBOOK.md`, `docs/SECURITY.md`, `docs/TESTING.md`, `docs/REALTIME_ARCHITECTURE.md`.
+
+---
+
 ## 1. Goal
 
 Python + React MVP that:

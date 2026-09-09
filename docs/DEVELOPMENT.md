@@ -15,6 +15,7 @@ npm run typecheck   # also npm run lint
 npm run build
 npm run test:roles
 npm run test:delivery
+npm run test:ops
 npm run firebase:emulators
 ```
 
