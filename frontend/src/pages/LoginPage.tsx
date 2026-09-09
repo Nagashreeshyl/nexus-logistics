@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo";
 import { useAuth } from "../firebase/AuthProvider";
-import { ROLE_HOME } from "../lib/roles";
+import { getRoleHomeRoute, pickActiveRole } from "../lib/roles";
 
 export function LoginPage() {
   const { status, profile, profileLoading, login, configError, authError } = useAuth();
@@ -24,8 +24,8 @@ export function LoginPage() {
       return <Navigate to="/unauthorized" replace />;
     }
     const from = (location.state as { from?: string } | null)?.from;
-    const dest =
-      from && !from.startsWith("/login") ? from : ROLE_HOME[profile.activeRole] ?? "/dispatcher";
+    const home = getRoleHomeRoute(pickActiveRole(profile.roles, profile.activeRole));
+    const dest = from && !from.startsWith("/login") ? from : home;
     return <Navigate to={dest} replace />;
   }
 

@@ -16,6 +16,105 @@ export const ROLE_HOME: Record<Role, string> = {
   analyst: "/analyst",
 };
 
+/** Centralized role → workspace route mapping. */
+export function getRoleHomeRoute(role: Role): string {
+  return ROLE_HOME[role];
+}
+
+/** Preferred default when activeRole is missing/invalid. */
+export const ROLE_DEFAULT_ORDER: readonly Role[] = [
+  "admin",
+  "dispatcher",
+  "driver",
+  "analyst",
+] as const;
+
+export const WORKSPACE_IDENTITY: Record<
+  Role,
+  { title: string; eyebrow: string; description: string }
+> = {
+  admin: {
+    title: "Admin",
+    eyebrow: "ADMIN",
+    description: "Administration & System Control",
+  },
+  dispatcher: {
+    title: "Dispatcher",
+    eyebrow: "DISPATCHER",
+    description: "Real-Time Operations",
+  },
+  driver: {
+    title: "Driver",
+    eyebrow: "DRIVER",
+    description: "My Route & Deliveries",
+  },
+  analyst: {
+    title: "Analyst",
+    eyebrow: "ANALYST",
+    description: "Insights & Performance",
+  },
+};
+
+export type WorkspaceNavItem = {
+  label: string;
+  to?: string;
+  /** Shown but not navigable until a later milestone */
+  soon?: boolean;
+};
+
+/** Role-specific navigation (workspace chrome). Authorization still uses roles[]. */
+const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
+  admin: [
+    { label: "Dashboard", to: "/admin" },
+    { label: "Fleet", soon: true },
+    { label: "Drivers", soon: true },
+    { label: "Customers", soon: true },
+    { label: "Users", soon: true },
+    { label: "Organizations", soon: true },
+    { label: "Audit", soon: true },
+  ],
+  dispatcher: [
+    { label: "Operations", to: "/dispatcher" },
+    { label: "Orders", soon: true },
+    { label: "Deliveries", to: "/dispatcher" },
+    { label: "Fleet", soon: true },
+    { label: "Drivers", soon: true },
+    { label: "Customers", soon: true },
+    { label: "Exceptions", to: "/dispatcher" },
+    { label: "Routes", soon: true },
+  ],
+  driver: [
+    { label: "My Route", to: "/driver" },
+    { label: "My Deliveries", to: "/driver" },
+    { label: "Vehicle", soon: true },
+    { label: "Exceptions", soon: true },
+    { label: "Profile", to: "/driver" },
+  ],
+  analyst: [
+    { label: "Overview", to: "/analyst" },
+    { label: "Orders", soon: true },
+    { label: "Deliveries", soon: true },
+    { label: "Fleet", soon: true },
+    { label: "Performance", soon: true },
+    { label: "Exceptions", soon: true },
+  ],
+};
+
+export function getWorkspaceNav(role: Role): WorkspaceNavItem[] {
+  const items = [...WORKSPACE_NAV_BASE[role]];
+  if (role === "dispatcher" && typeof import.meta !== "undefined" && import.meta.env?.DEV) {
+    items.push({ label: "Realtime Lab", to: "/dispatcher/realtime-lab" });
+  }
+  return items;
+}
+
+/** Resolve workspace role from a pathname like /dispatcher/orders → dispatcher */
+export function roleFromPathname(pathname: string): Role | null {
+  const seg = pathname.split("/").filter(Boolean)[0];
+  if (seg && (ALL_ROLES as readonly string[]).includes(seg)) return seg as Role;
+  return null;
+}
+
 /** Capability keys — UI may hide controls; server/rules enforce for real. */
 export type Permission =
   | "manage_users"
@@ -81,7 +180,9 @@ export function hasPermission(user: NexusUser | null | undefined, permission: Pe
 
 export function pickActiveRole(roles: Role[], preferred?: string | null): Role {
   if (preferred && roles.includes(preferred as Role)) return preferred as Role;
-  if (roles.includes("dispatcher")) return "dispatcher";
+  for (const r of ROLE_DEFAULT_ORDER) {
+    if (roles.includes(r)) return r;
+  }
   return roles[0] ?? "dispatcher";
 }
 

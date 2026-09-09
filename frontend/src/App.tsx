@@ -6,7 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { AdminHome, AnalystHome, DispatcherHome, DriverHome } from "./pages/RoleHomes";
 import { Console } from "./pages/Console";
-import { ROLE_HOME } from "./lib/roles";
+import { getRoleHomeRoute, pickActiveRole } from "./lib/roles";
 
 function LabPage() {
   return <Console onBack={() => window.history.back()} />;
@@ -17,7 +17,7 @@ function HomeRedirect() {
   if (!profile || profile.roles.length === 0) {
     return <Navigate to="/unauthorized" replace />;
   }
-  return <Navigate to={ROLE_HOME[profile.activeRole]} replace />;
+  return <Navigate to={getRoleHomeRoute(pickActiveRole(profile.roles, profile.activeRole))} replace />;
 }
 
 export function App() {

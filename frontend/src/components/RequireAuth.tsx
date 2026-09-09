@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthProvider";
 import type { Role } from "../lib/roles";
+import { getRoleHomeRoute, pickActiveRole } from "../lib/roles";
 
 export function RequireAuth({ children }: { children?: ReactNode }) {
   const { status, configError, authError } = useAuth();
@@ -63,6 +64,9 @@ export function RequireRole({ role }: { role: Role }) {
   }
 
   if (!canAccess(role)) {
+    if (profile.roles.length > 0) {
+      return <Navigate to={getRoleHomeRoute(pickActiveRole(profile.roles))} replace />;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 
