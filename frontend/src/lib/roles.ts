@@ -87,8 +87,8 @@ const WORKSPACE_NAV_BASE: Record<Role, readonly WorkspaceNavItem[]> = {
   ],
   driver: [
     { label: "My Route", to: "/driver" },
-    { label: "My Deliveries", to: "/driver" },
-    { label: "Vehicle", soon: true },
+    { label: "My Deliveries", to: "/driver/route" },
+    { label: "Vehicle", to: "/driver/vehicle" },
   ],
   analyst: [
     { label: "Overview", to: "/analyst" },

@@ -134,11 +134,41 @@ export function DispatcherHome() {
 
 export function DriverHome() {
   return (
-    <div>
-      <div className="mx-auto max-w-[960px] px-4 pt-6">
-        <WorkspaceHeader role="driver" />
-      </div>
-      <DriverOpsPage />
-    </div>
+    <Routes>
+      <Route
+        index
+        element={
+          <div>
+            <div className="mx-auto max-w-[960px] px-4 pt-6">
+              <WorkspaceHeader role="driver" />
+            </div>
+            <DriverOpsPage />
+          </div>
+        }
+      />
+      <Route
+        path="route"
+        element={
+          <div>
+            <div className="mx-auto max-w-[960px] px-4 pt-6">
+              <WorkspaceHeader role="driver" />
+            </div>
+            <DriverOpsPage />
+          </div>
+        }
+      />
+      <Route
+        path="vehicle"
+        element={
+          <div>
+            <div className="mx-auto max-w-[960px] px-4 pt-6">
+              <WorkspaceHeader role="driver" />
+            </div>
+            <DriverOpsPage />
+          </div>
+        }
+      />
+      <Route path="*" element={<Navigate to="." replace />} />
+    </Routes>
   );
 }

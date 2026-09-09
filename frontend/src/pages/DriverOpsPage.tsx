@@ -5,6 +5,7 @@ import { nextPrimaryTransition, DELIVERY_STATUS_LABEL, type DeliveryStatus } fro
 import type { OpsDelivery } from "../lib/opsTypes";
 import { LiveSyncBadge, RiskPill, StatusBadge, formatLastSeen } from "../components/ops/OpsBadges";
 import { transitionDeliveryStatus } from "../services/firestore/operations";
+import { DriverRouteMap } from "../components/ops/DriverRouteMap";
 
 const PRIMARY_LABEL: Partial<Record<DeliveryStatus, string>> = {
   EN_ROUTE: "Start delivery",
@@ -84,6 +85,15 @@ export function DriverOpsPage() {
           {error || deliveriesQ.error}
         </p>
       )}
+
+      <DriverRouteMap
+        deliveries={mine}
+        driverLocation={
+          mine[0]?.lastLocation
+            ? { lat: mine[0].lastLocation.lat, lon: mine[0].lastLocation.lon, synthetic: mine[0].lastLocation.synthetic }
+            : { lat: 12.9716, lon: 77.5946, synthetic: true }
+        }
+      />
 
       <ol className="mt-6 space-y-3">
         {mine.length === 0 && !deliveriesQ.loading && (
